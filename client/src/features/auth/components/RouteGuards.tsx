@@ -23,6 +23,9 @@ export function ProtectedRoute() {
 
 export function GuestRoute() {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
   if (isLoading) return <AuthLoading />;
-  return user ? <Navigate to="/projects" replace /> : <Outlet />;
+  const redirect = new URLSearchParams(location.search).get('redirect');
+  const destination = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : '/projects';
+  return user ? <Navigate to={destination} replace /> : <Outlet />;
 }

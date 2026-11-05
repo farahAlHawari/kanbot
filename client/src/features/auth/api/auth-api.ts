@@ -7,4 +7,4 @@ export const login = (input: LoginRequest) =>
 export const register = (input: RegisterRequest) =>
   request<AuthResponse>('/auth/register', { method: 'POST', body: input, authenticated: false });
 
-export const getCurrentUser = () => request<MeResponse>('/auth/me');
+export const me = () => request<MeResponse>('/auth/me');

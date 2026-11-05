@@ -3,6 +3,8 @@ import type { User } from '../../../shared/types/api';
 
 export interface AuthContextValue {
   user: User | null;
+  token: string | null;
+  status: 'loading' | 'authenticated' | 'unauthenticated';
   isLoading: boolean;
   sessionError: string | null;
   login: (email: string, password: string) => Promise<User>;

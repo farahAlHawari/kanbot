@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Box, CircularProgress } from '@mui/material';
 import { configureApiAuth } from '../../shared/api/api-client';
 import { ApiError } from '../../shared/api/errors';
 import type { User } from '../../shared/types/api';
-import { getCurrentUser, login as loginRequest, register as registerRequest } from './api/auth-api';
+import { login as loginRequest, me, register as registerRequest } from './api/auth-api';
 import { AuthContext, type AuthContextValue } from './hooks/auth-context';
 
 const TOKEN_KEY = 'kanbot-token';
@@ -21,17 +22,25 @@ function storeToken(token: string | null): void {
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(() => readToken());
   const [isLoading, setIsLoading] = useState(() => Boolean(readToken()));
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const expirationHandled = useRef(false);
 
   const expireSession = useCallback(() => {
+    if (expirationHandled.current) return;
+    expirationHandled.current = true;
     storeToken(null);
+    setToken(null);
     setUser(null);
     setSessionError(SESSION_EXPIRED_MESSAGE);
     queryClient.clear();
-    const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    const search = new URLSearchParams({ redirect, expired: '1' });
-    window.location.replace(`/login?${search.toString()}`);
+    const isGuestPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+    const params = new URLSearchParams({ expired: '1' });
+    if (!isGuestPage) {
+      params.set('redirect', `${window.location.pathname}${window.location.search}${window.location.hash}`);
+    }
+    window.location.replace(`/login?${params.toString()}`);
   }, [queryClient]);
 
   useEffect(() => {
@@ -39,8 +48,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const token = readToken();
     if (!token) return () => configureApiAuth(null);
 
-    void getCurrentUser()
-      .then(({ user: currentUser }) => setUser(currentUser))
+    void me()
+      .then(({ user: currentUser }) => {
+        setUser(currentUser);
+        setSessionError(null);
+      })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.status !== 401) {
           setSessionError(error.message);
@@ -54,21 +66,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const login = useCallback(async (email: string, password: string) => {
     const result = await loginRequest({ email, password });
     storeToken(result.token);
+    setToken(result.token);
     setSessionError(null);
     setUser(result.user);
+    expirationHandled.current = false;
     return result.user;
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
     const result = await registerRequest({ name, email, password });
     storeToken(result.token);
+    setToken(result.token);
     setSessionError(null);
     setUser(result.user);
+    expirationHandled.current = false;
     return result.user;
   }, []);
 
   const logout = useCallback(() => {
     storeToken(null);
+    setToken(null);
     setUser(null);
     setSessionError(null);
     queryClient.clear();
@@ -76,9 +93,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, sessionError, login, register, logout }),
-    [user, isLoading, sessionError, login, register, logout],
+    () => ({
+      user,
+      token,
+      status: isLoading ? 'loading' : user ? 'authenticated' : 'unauthenticated',
+      isLoading,
+      sessionError,
+      login,
+      register,
+      logout,
+    }),
+    [user, token, isLoading, sessionError, login, register, logout],
   );
+
+  if (isLoading) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} aria-label="Loading session">
+        <CircularProgress aria-label="Loading" />
+      </Box>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

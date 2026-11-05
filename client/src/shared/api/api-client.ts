@@ -23,12 +23,10 @@ const baseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, headers, authenticated = true, ...init } = options;
   const requestHeaders = new Headers(headers);
+  const requestToken = authenticated ? authHandlers?.getToken() ?? null : null;
   if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
 
-  if (authenticated) {
-    const token = authHandlers?.getToken();
-    if (token) requestHeaders.set('Authorization', `Bearer ${token}`);
-  }
+  if (requestToken) requestHeaders.set('Authorization', `Bearer ${requestToken}`);
 
   let response: Response;
   try {
@@ -53,8 +51,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (!response.ok) {
     const error = toApiError(response.status, responseBody);
-    if (response.status === 401 && authenticated && !path.startsWith('/auth/login') && !path.startsWith('/auth/register')) {
-      authHandlers?.onUnauthorized();
+    if (response.status === 401 && requestToken && authHandlers?.getToken() === requestToken) {
+      authHandlers.onUnauthorized();
     }
     throw error;
   }
