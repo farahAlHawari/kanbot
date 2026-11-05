@@ -1,19 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import ExpandMoreOutlined from '@mui/icons-material/ExpandMoreOutlined';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import DragIndicatorOutlined from '@mui/icons-material/DragIndicatorOutlined';
 import MoreVertOutlined from '@mui/icons-material/MoreVertOutlined';
 import {
   Alert,
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Box,
   Button,
   Chip,
@@ -37,11 +33,12 @@ import { ApiError } from '../../../shared/api/errors';
 import { ErrorState } from '../../../shared/components/ui';
 import type { Sprint, Todo, TodoPriority, TodoType } from '../../../shared/types/api';
 import { TODO_PRIORITIES, TODO_TYPES } from '../../../shared/types/api';
-import { createTodo, listTodos, moveTodo } from '../api/todos-api';
-import { listSprints } from '../../sprints/api/sprints-api';
+import { createTodo, moveTodo, updateTodo } from '../api/todos-api';
 import { GenerateTodosDialog } from '../components/GenerateTodosDialog';
 import { TodoDetailsDialog } from '../components/TodoDetailsDialog';
 import { backlogQueryKey, todosQueryKey, useBacklog } from '../hooks/use-backlog';
+import { SprintSections } from '../../sprints/components/SprintSections';
+import { useSprints } from '../../sprints/hooks/use-sprints';
 
 const priorityColors: Record<TodoPriority, 'default' | 'info' | 'warning' | 'error'> = {
   low: 'info',
@@ -61,12 +58,16 @@ function TodoRow({
   disabled,
   onOpen,
   onMove,
+  sprints,
+  onAssign,
 }: {
   todo: Todo;
   index: number;
   disabled: boolean;
   onOpen: () => void;
   onMove: (position: number) => void;
+  sprints: Sprint[];
+  onAssign: (sprintId: string) => void;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -184,35 +185,19 @@ function TodoRow({
         >
           Move to bottom
         </MenuItem>
+        {sprints.length ? <MenuItem disabled>Move to Sprint</MenuItem> : null}
+        {sprints.map((sprint) => (
+          <MenuItem
+            key={sprint.id}
+            onClick={() => {
+              setMenuAnchor(null);
+              onAssign(sprint.id);
+            }}
+          >
+            {sprint.name}{sprint.status === 'active' ? ' (Active)' : ''}
+          </MenuItem>
+        ))}
       </Menu>
-    </Paper>
-  );
-}
-
-function SprintTodoRow({ todo, onOpen }: { todo: Todo; onOpen: () => void }) {
-  return (
-    <Paper
-      variant="outlined"
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
-      sx={{ p: 1.5, cursor: 'pointer', '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' } }}
-    >
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <Typography variant="caption" sx={{ fontWeight: 700 }} color="text.secondary">{todo.key}</Typography>
-        <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{todo.title}</Typography>
-      </Stack>
-      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap', mt: 1 }}>
-        <Chip size="small" variant="outlined" label={labelFor(todo.type)} />
-        <Chip size="small" color={priorityColors[todo.priority]} label={labelFor(todo.priority)} />
-        {todo.storyPoints !== null ? <Chip size="small" variant="outlined" label={`${todo.storyPoints} pts`} /> : null}
-      </Stack>
     </Paper>
   );
 }
@@ -220,20 +205,10 @@ function SprintTodoRow({ todo, onOpen }: { todo: Todo; onOpen: () => void }) {
 export function BacklogPage() {
   const { projectId = '' } = useParams();
   const { data, isLoading, isError, error, refetch } = useBacklog(projectId);
-  const sprintsQuery = useQuery({
-    queryKey: ['sprints', projectId],
-    queryFn: () => listSprints(projectId),
-    enabled: projectId.length > 0,
-  });
+  const sprintsQuery = useSprints(projectId);
   const openSprints: Sprint[] = sprintsQuery.data?.sprints.filter(
     (sprint) => sprint.status === 'planned' || sprint.status === 'active',
   ) ?? [];
-  const sprintTodosQueries = useQueries({
-    queries: openSprints.map((sprint) => ({
-      queryKey: [...todosQueryKey(projectId), sprint.id],
-      queryFn: () => listTodos(projectId, { sprintId: sprint.id }),
-    })),
-  });
   const queryClient = useQueryClient();
   const { notify } = useFeedback();
   const todos = data?.todos ?? EMPTY_TODOS;
@@ -281,6 +256,21 @@ export function BacklogPage() {
     },
     onError: (failure: unknown) => {
       setQuickError(failure instanceof ApiError ? failure.message : 'Unable to create the Todo. Please try again.');
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: ({ todo, sprintId }: { todo: Todo; sprintId: string }) =>
+      updateTodo(todo.id, { sprintId }),
+    onSuccess: async ({ todo }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: todosQueryKey(projectId) }),
+        queryClient.invalidateQueries({ queryKey: ['sprints', projectId] }),
+      ]);
+      notify(`${todo.key} moved to a Sprint.`);
+    },
+    onError: (failure: unknown) => {
+      notify(failure instanceof Error ? failure.message : 'Unable to move the Todo.', 'error');
     },
   });
 
@@ -378,6 +368,8 @@ export function BacklogPage() {
         </Stack>
       </Stack>
 
+      <SprintSections projectId={projectId} onTodoOpen={setSelectedTodo} />
+
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
         <TextField
           label="Search backlog"
@@ -453,56 +445,14 @@ export function BacklogPage() {
                   disabled={filtersActive || reorderMutation.isPending}
                   onOpen={() => setSelectedTodo(todo)}
                   onMove={(position) => moveToPosition(todo, position)}
+                  sprints={openSprints}
+                  onAssign={(sprintId) => assignMutation.mutate({ todo, sprintId })}
                 />
               ))}
             </Stack>
           </SortableContext>
         </DndContext>
       )}
-
-      {openSprints.length ? (
-        <Box>
-          <Typography component="h2" variant="h3" sx={{ mb: 1 }}>Planned and active Sprints</Typography>
-          <Stack spacing={1}>
-            {openSprints.map((sprint, index) => {
-              const sprintTodosQuery = sprintTodosQueries[index];
-              const sprintTodos = sprintTodosQuery?.data?.todos ?? [];
-              return (
-                <Accordion key={sprint.id} disableGutters variant="outlined">
-                  <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Typography sx={{ fontWeight: 600 }}>{sprint.name}</Typography>
-                      <Chip
-                        size="small"
-                        color={sprint.status === 'active' ? 'success' : 'default'}
-                        label={sprint.status === 'active' ? 'Active' : 'Planned'}
-                      />
-                      <Typography variant="body2" color="text.secondary">
-                        {sprintTodos.length} Todo{sprintTodos.length === 1 ? '' : 's'}
-                      </Typography>
-                    </Stack>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    {sprintTodosQuery?.isLoading ? (
-                      <Stack spacing={1}><Skeleton height={64} /><Skeleton height={64} /></Stack>
-                    ) : sprintTodosQuery?.isError ? (
-                      <ErrorState message={`Could not load Todos for ${sprint.name}.`} />
-                    ) : sprintTodos.length ? (
-                      <Stack spacing={1}>
-                        {sprintTodos.map((todo) => (
-                          <SprintTodoRow key={todo.id} todo={todo} onOpen={() => setSelectedTodo(todo)} />
-                        ))}
-                      </Stack>
-                    ) : (
-                      <Typography color="text.secondary">No Todos assigned to this Sprint.</Typography>
-                    )}
-                  </AccordionDetails>
-                </Accordion>
-              );
-            })}
-          </Stack>
-        </Box>
-      ) : null}
 
       <Paper variant="outlined" sx={{ p: 1.5 }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
