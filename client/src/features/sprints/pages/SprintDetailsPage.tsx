@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, Card, CardContent, Chip, CircularProgress, LinearProgress, Paper, Stack, Typography } from '@mui/material';
-import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router-dom';
 import { getSprint } from '../api/sprints-api';
 import { listTodos } from '../../todos/api/todos-api';
 import type { SprintStats, Todo } from '../../../shared/types/api';
+import { SprintSummaryPanel } from '../../ai-assistant/components/SprintSummaryPanel';
 
 function dateLabel(date: string | null) {
   return date ? new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : 'Not set';
@@ -81,17 +81,7 @@ export function SprintDetailsPage() {
         </CardContent>
       </Card>
 
-      {sprint.summary ? (
-        <Card variant="outlined">
-          <CardContent>
-            <Typography component="h2" variant="h3" gutterBottom>AI Sprint summary</Typography>
-            <ReactMarkdown>{sprint.summary.content}</ReactMarkdown>
-            <Typography variant="caption" color="text.secondary">
-              Generated {new Date(sprint.summary.generatedAt).toLocaleString()} · {sprint.summary.source}
-            </Typography>
-          </CardContent>
-        </Card>
-      ) : null}
+      {sprint.status !== 'planned' ? <SprintSummaryPanel sprint={sprint} projectId={projectId} /> : null}
 
       <Stack spacing={1}>
         <Typography component="h2" variant="h3">{sprint.status === 'completed' ? 'Completed Todos' : 'Todos'}</Typography>

@@ -43,6 +43,7 @@ import { useFeedback } from '../../../app/providers/use-feedback';
 import { ApiError } from '../../../shared/api/errors';
 import { ErrorState } from '../../../shared/components/ui';
 import { TODO_STATUSES, type Sprint, type SprintBoardResponse, type Todo, type TodoStatus } from '../../../shared/types/api';
+import { SprintSummaryPanel } from '../../ai-assistant/components/SprintSummaryPanel';
 import { listSprints, completeSprint } from '../api/sprints-api';
 import { summarizeSprint } from '../../ai-assistant/api/ai-api';
 import { getSprintBoard } from '../api/sprints-api';
@@ -365,7 +366,9 @@ export function BoardPage() {
         try {
           await summarizeSprint(activeSprint.id);
         } catch (failure) {
-          summaryError = failure instanceof Error ? failure.message : 'The Sprint completed, but its AI summary could not be generated.';
+          summaryError = failure instanceof ApiError && failure.status === 429
+            ? 'Too many requests. Please wait a moment.'
+            : failure instanceof Error ? failure.message : 'The Sprint completed, but its AI summary could not be generated.';
         }
       }
       return { completion, summaryError };
@@ -466,6 +469,8 @@ export function BoardPage() {
           </Stack>
         </Stack>
       </Paper>
+
+      <SprintSummaryPanel sprint={sprint} projectId={projectId} />
 
       {moveMutation.error ? <Alert severity="error">{moveMutation.error instanceof ApiError ? moveMutation.error.message : 'Todo move failed.'}</Alert> : null}
       <DndContext

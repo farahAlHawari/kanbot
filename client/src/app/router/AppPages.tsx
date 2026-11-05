@@ -3,6 +3,7 @@ import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
 import FolderOutlined from '@mui/icons-material/FolderOutlined';
 import ViewKanbanOutlined from '@mui/icons-material/ViewKanbanOutlined';
 import ViewListOutlined from '@mui/icons-material/ViewListOutlined';
+import { useState } from 'react';
 import {
   Alert,
   AppBar,
@@ -17,13 +18,13 @@ import {
   MenuItem,
   TextField,
   Toolbar,
-  Tooltip,
   Typography,
 } from '@mui/material';
 import { Link as RouterLink, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import kanbotLogo from '../../assets/kanbot-logo.svg';
 import { useAuth } from '../../features/auth';
 import { useProjects } from '../../features/projects';
+import { AssistantDrawer } from '../../features/ai-assistant/components/AssistantDrawer';
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/projects') return 'Projects';
@@ -129,6 +130,7 @@ function PageBreadcrumbs({ projectName, projectId, title }: { projectName?: stri
 }
 
 export function AppShell() {
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -204,13 +206,9 @@ export function AppShell() {
               <Box sx={{ display: { xs: 'block', md: 'none' } }}>
                 <ProjectSwitcher mobile />
               </Box>
-              <Tooltip title="The AI assistant will be available in a later phase">
-                <span>
-                  <Button variant="outlined" startIcon={<AutoAwesomeOutlined />} disabled>
-                    Ask AI
-                  </Button>
-                </span>
-              </Tooltip>
+              <Button variant="outlined" startIcon={<AutoAwesomeOutlined />} onClick={() => setAssistantOpen(true)}>
+                Ask AI
+              </Button>
               <Button variant="contained" onClick={createProject}>New project</Button>
               <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2">{user?.name}</Typography>
@@ -231,6 +229,7 @@ export function AppShell() {
           <Outlet />
         </Box>
       </Box>
+      <AssistantDrawer key={projectId ?? 'no-project'} open={assistantOpen} onClose={() => setAssistantOpen(false)} projectId={projectId} />
     </Box>
   );
 }

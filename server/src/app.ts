@@ -16,7 +16,14 @@ export function createApp() {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: env.clientOrigins }));
+  app.use(cors({
+    origin: (origin, callback) => {
+      const localDevelopmentOrigin = !env.isProduction
+        && origin !== undefined
+        && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+      callback(null, !origin || env.clientOrigins.includes(origin) || localDevelopmentOrigin);
+    },
+  }));
   app.use(express.json({ limit: '1mb' }));
   if (env.NODE_ENV !== 'test') app.use(requestLogger);
 
