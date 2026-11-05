@@ -86,8 +86,13 @@ export function TodoDetailsDialog({
   const saveMutation = useMutation({
     mutationFn: (input: UpdateTodoRequest) => updateTodo(todo.id, input),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: todosQueryKey(projectId) });
-      await queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: todosQueryKey(projectId) }),
+        queryClient.invalidateQueries({ queryKey: ['sprints', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['sprint-board'] }),
+        queryClient.invalidateQueries({ queryKey: ['sprint-todos'] }),
+        queryClient.invalidateQueries({ queryKey: ['sprint'] }),
+      ]);
       notify(`${todo.key} updated.`);
       onClose();
     },
@@ -117,8 +122,13 @@ export function TodoDetailsDialog({
       return { previousBacklog };
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: todosQueryKey(projectId) });
-      await queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: todosQueryKey(projectId) }),
+        queryClient.invalidateQueries({ queryKey: ['sprints', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['sprint-board'] }),
+        queryClient.invalidateQueries({ queryKey: ['sprint-todos'] }),
+        queryClient.invalidateQueries({ queryKey: ['sprint'] }),
+      ]);
       notify(`${todo.key} deleted.`);
       onClose();
     },

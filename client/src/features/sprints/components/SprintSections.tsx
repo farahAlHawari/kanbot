@@ -466,6 +466,9 @@ export function SprintSections({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: sprintsQueryKey(projectId) }),
       queryClient.invalidateQueries({ queryKey: todosQueryKey(projectId) }),
+      queryClient.invalidateQueries({ queryKey: ['sprint-board'] }),
+      queryClient.invalidateQueries({ queryKey: ['sprint-todos'] }),
+      queryClient.invalidateQueries({ queryKey: ['sprint'] }),
     ]);
   }
 

@@ -3,6 +3,7 @@ import type {
   CompleteSprintRequest,
   CreateSprintRequest,
   Sprint,
+  SprintBoardResponse,
   SprintListResponse,
   StartSprintRequest,
   UpdateSprintRequest,
@@ -15,6 +16,9 @@ export const createSprint = (projectId: string, input: CreateSprintRequest) =>
   request<{ sprint: Sprint }>(`/projects/${projectId}/sprints`, { method: 'POST', body: input });
 
 export const getSprint = (sprintId: string) => request<{ sprint: Sprint }>(`/sprints/${sprintId}`);
+
+export const getSprintBoard = (sprintId: string) =>
+  request<SprintBoardResponse>(`/sprints/${sprintId}/todos`);
 
 export const updateSprint = (sprintId: string, input: UpdateSprintRequest) =>
   request<{ sprint: Sprint }>(`/sprints/${sprintId}`, { method: 'PATCH', body: input });
