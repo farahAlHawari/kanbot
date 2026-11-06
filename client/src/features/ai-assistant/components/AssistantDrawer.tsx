@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import {
   Alert,
   Box,
@@ -25,6 +26,8 @@ import { summarizeSprint } from '../api/ai-api';
 import { chat, getAiStatus } from '../api/ai-api';
 import { AiSprintPlanningDialog } from './AiSprintPlanningDialog';
 import { GenerateTodosDialog } from '../../todos/components/GenerateTodosDialog';
+import kanbotIcon from '../../../assets/brand/kanbot-icon.svg';
+import { useLocale } from '../../../app/providers/use-locale';
 
 function visibleAiError(error: unknown) {
   if (error instanceof ApiError && error.status === 429) return 'Too many requests. Please wait a moment.';
@@ -41,6 +44,7 @@ export function AssistantDrawer({
   onClose: () => void;
   projectId?: string;
 }) {
+  const { t } = useLocale();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -118,51 +122,72 @@ export function AssistantDrawer({
         open={open}
         onClose={onClose}
         ModalProps={{ keepMounted: true }}
-        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 440 }, maxWidth: '100%', display: 'flex' } } }}
+        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 440 }, maxWidth: '100%', height: '100dvh', minHeight: 0, display: 'flex' } } }}
       >
         <Stack sx={{ height: '100%', minHeight: 0 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', p: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Box component="img" src={kanbotIcon} alt="" aria-hidden="true" sx={{ width: 32, height: 32, flexShrink: 0 }} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography component="h2" variant="h3">Kanbot AI</Typography>
+              <Typography component="h2" variant="h3">{t('Kanbot Assistant')}</Typography>
               {statusQuery.data?.mode === 'ai' && statusQuery.data.model ? (
                 <Typography variant="caption" color="text.secondary">{statusQuery.data.model}</Typography>
               ) : null}
             </Box>
-            {statusQuery.data?.mode === 'mock' ? <Chip size="small" label="Mock AI" variant="outlined" /> : null}
-            <Tooltip title="New chat">
-              <IconButton aria-label="New chat" onClick={createNewChat} disabled={chatMutation.isPending}><span aria-hidden="true">＋</span></IconButton>
+            {statusQuery.data?.mode === 'mock' ? <Chip size="small" label={t('Mock AI')} sx={{ bgcolor: 'var(--primary-soft)', color: 'var(--primary-soft-text)', border: '1px solid var(--mui-palette-brand-200)' }} /> : null}
+            <Tooltip title={t('New chat')}>
+              <IconButton aria-label={t('New chat')} onClick={createNewChat} disabled={chatMutation.isPending}><span aria-hidden="true">＋</span></IconButton>
             </Tooltip>
-            <IconButton aria-label="Close assistant" onClick={onClose}><CloseOutlined /></IconButton>
+            <IconButton aria-label={t('Close assistant')} onClick={onClose}><CloseOutlined /></IconButton>
           </Stack>
 
-          <Stack direction="row" spacing={1} sx={{ p: 1.5, borderBottom: 1, borderColor: 'divider', flexWrap: 'wrap' }}>
-            <Button size="small" variant="outlined" disabled={!projectId} onClick={() => setGenerateOpen(true)}>Create todos</Button>
-            <Button size="small" variant="outlined" disabled={!projectId} onClick={() => setPlanOpen(true)}>Plan sprint</Button>
-            <Button size="small" variant="outlined" disabled={!summarySprint || summaryMutation.isPending} onClick={() => summarySprint && projectId && summaryMutation.mutate({ targetProjectId: projectId, sprintId: summarySprint.id })}>
-              Summarize sprint
+          <Stack direction="row" spacing={1} sx={{ p: 1.5, borderBottom: 1, borderColor: 'divider', flexWrap: 'nowrap', overflowX: 'auto' }}>
+            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!projectId} onClick={() => setGenerateOpen(true)}>{t('Create todos')}</Button>
+            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!projectId} onClick={() => setPlanOpen(true)}>{t('Plan sprint')}</Button>
+            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!summarySprint || summaryMutation.isPending} onClick={() => summarySprint && projectId && summaryMutation.mutate({ targetProjectId: projectId, sprintId: summarySprint.id })}>
+              {t('Summarize sprint')}
             </Button>
           </Stack>
 
-          <Box ref={listRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2 }}>
-            {statusQuery.isError ? <Alert severity="warning" sx={{ mb: 1 }}>AI status is unavailable. You can still try a request.</Alert> : null}
-            {!projectId ? <Alert severity="info" sx={{ mb: 1 }}>Select a project to chat with the assistant.</Alert> : null}
+          <Box ref={listRef} role="log" aria-label={t('Assistant conversation')} aria-live="polite" sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2 }}>
+            {statusQuery.isError ? <Alert severity="warning" sx={{ mb: 1 }}>{t('AI status is unavailable. You can still try a request.')}</Alert> : null}
+            {!projectId ? <Alert severity="info" sx={{ mb: 1 }}>{t('Select a project to chat with the assistant.')}</Alert> : null}
+            {messages.length > 0 ? <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mb: 1 }}>{t('Today')}</Typography> : null}
             {messages.map((message, index) => (
-              <Paper key={`${index}-${message.role}`} variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: message.role === 'user' ? 'action.hover' : 'background.paper' }}>
-                <Typography variant="caption" color="text.secondary">{message.role === 'user' ? 'You' : 'Kanbot AI'}</Typography>
-                <Box sx={{ overflowWrap: 'anywhere', '& p:first-of-type': { mt: 0.5 }, '& p:last-child': { mb: 0 } }}>
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                </Box>
-              </Paper>
+              <Stack key={`${index}-${message.role}`} direction={message.role === 'user' ? 'row-reverse' : 'row'} spacing={1} sx={{ alignItems: 'flex-start', mb: 1.5 }}>
+                {message.role === 'assistant' ? <Box component="img" src={kanbotIcon} alt="" aria-hidden="true" sx={{ width: 28, height: 28, mt: 0.5 }} /> : null}
+                <Paper variant="outlined" sx={{
+                  maxWidth: '85%',
+                  p: 1.5,
+                  bgcolor: message.role === 'user' ? 'primary.main' : 'background.subtle',
+                  color: message.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                  borderRadius: message.role === 'user' ? '12px 12px 4px 12px' : '4px 12px 12px 12px',
+                  overflowWrap: 'anywhere',
+                  '& p:first-of-type': { mt: 0.5 },
+                  '& p:last-child': { mb: 0 },
+                  '& h1, & h2, & h3, & h4': { fontSize: '0.875rem', lineHeight: '22px', fontWeight: 600, mt: 1.5, mb: 0.5 },
+                  '& h1:first-child, & h2:first-child, & h3:first-child, & h4:first-child': { mt: 0.5 },
+                  '& ul, & ol': { pl: 2.5, my: 0.75 },
+                  '& li + li': { mt: 0.5 },
+                  '& pre': { maxWidth: '100%', overflowX: 'auto', p: 1, bgcolor: 'background.muted', borderRadius: 1 },
+                  '& code': { fontFamily: '"JetBrains Mono Variable", ui-monospace, monospace' },
+                  '& a': { color: 'primary.light' },
+                  '& table': { display: 'block', maxWidth: '100%', overflowX: 'auto', borderCollapse: 'collapse' },
+                  '& th, & td': { border: 1, borderColor: 'divider', p: 0.5 },
+                }}>
+                  <Typography variant="caption" color={message.role === 'user' ? 'inherit' : 'text.secondary'}>{message.role === 'user' ? t('You') : 'Kanbot AI'}</Typography>
+                  <Box><ReactMarkdown>{message.content}</ReactMarkdown></Box>
+                </Paper>
+              </Stack>
             ))}
             {chatMutation.isPending ? (
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', color: 'text.secondary', mb: 1.5 }}>
-                <CircularProgress size={16} /><Typography>Thinking...</Typography>
+                <CircularProgress size={16} /><Typography>{t('Thinking...')}</Typography>
               </Stack>
             ) : null}
             {chatMutation.isError ? (
               <Alert severity="error" sx={{ mb: 1 }} action={
-                chatMutation.error instanceof ApiError && chatMutation.error.status === 502 ? (
-                  <Button color="inherit" size="small" onClick={() => chatMutation.variables && chatMutation.mutate(chatMutation.variables)}>Retry</Button>
+                chatMutation.error instanceof ApiError && (chatMutation.error.status === 429 || chatMutation.error.status === 502) ? (
+                  <Button color="inherit" size="small" onClick={() => chatMutation.variables && chatMutation.mutate(chatMutation.variables)}>{t('Retry')}</Button>
                 ) : undefined
               }>
                 {visibleAiError(chatMutation.error)}
@@ -170,8 +195,8 @@ export function AssistantDrawer({
             ) : null}
             {summaryMutation.isError ? (
               <Alert severity="error" sx={{ mb: 1 }} action={
-                summaryMutation.error instanceof ApiError && summaryMutation.error.status === 502 ? (
-                  <Button color="inherit" size="small" onClick={() => summaryMutation.variables && summaryMutation.mutate(summaryMutation.variables)}>Retry</Button>
+                summaryMutation.error instanceof ApiError && (summaryMutation.error.status === 429 || summaryMutation.error.status === 502) ? (
+                  <Button color="inherit" size="small" onClick={() => summaryMutation.variables && summaryMutation.mutate(summaryMutation.variables)}>{t('Retry')}</Button>
                 ) : undefined
               }>
                 {visibleAiError(summaryMutation.error)}
@@ -179,9 +204,9 @@ export function AssistantDrawer({
             ) : null}
             {summary ? (
               <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5 }}>
-                <Typography variant="subtitle2">Sprint summary</Typography>
+                <Typography variant="subtitle2">{t('Sprint summary')}</Typography>
                 <ReactMarkdown>{summary.content}</ReactMarkdown>
-                <Typography variant="caption" color="text.secondary">Generated {new Date(summary.generatedAt).toLocaleString()} · {summary.source}</Typography>
+                <Typography variant="caption" color="text.secondary">{t('Generated')} {new Date(summary.generatedAt).toLocaleString('en')} · {summary.source}</Typography>
               </Paper>
             ) : null}
           </Box>
@@ -189,8 +214,8 @@ export function AssistantDrawer({
           <Box component="form" onSubmit={sendMessage} sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
               <TextField
-                label="Message"
-                placeholder="Ask about this project..."
+                label={t('Message')}
+                placeholder={t('Ask about this project...')}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={onInputKeyDown}
@@ -201,14 +226,14 @@ export function AssistantDrawer({
                 disabled={!projectId || chatMutation.isPending}
                 slotProps={{ htmlInput: { maxLength: 4000 } }}
               />
-              <IconButton type="submit" color="primary" aria-label="Send message" disabled={!projectId || !input.trim() || input.length > 4000 || chatMutation.isPending}>
-                {chatMutation.isPending ? <CircularProgress size={22} /> : <SendOutlined />}
-              </IconButton>
+              <Button type="submit" variant="contained" aria-label={t('Send message')} disabled={!projectId || !input.trim() || input.length > 4000 || chatMutation.isPending} startIcon={chatMutation.isPending ? <CircularProgress size={18} color="inherit" /> : <SendOutlined />}>
+                {t('Send')}
+              </Button>
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-              Enter to send · Shift + Enter for a new line
+              {t('Enter to send · Shift + Enter for a new line')}
             </Typography>
-            <Typography variant="caption" color="text.secondary">AI can make mistakes. Review before saving.</Typography>
+            <Typography variant="caption" color="text.secondary">{t('AI can make mistakes. Review before saving.')}</Typography>
           </Box>
         </Stack>
       </Drawer>

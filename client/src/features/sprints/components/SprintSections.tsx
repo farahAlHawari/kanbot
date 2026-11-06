@@ -34,6 +34,8 @@ import { listTodos, updateTodo } from '../../todos/api/todos-api';
 import { TodoDetailsDialog } from '../../todos/components/TodoDetailsDialog';
 import { todosQueryKey } from '../../todos/hooks/use-backlog';
 import { sprintsQueryKey, useSprints } from '../hooks/use-sprints';
+import { EmptyState, ErrorState, LoadingState } from '../../../shared/components/ui';
+import { useLocale } from '../../../app/providers/use-locale';
 
 function localDate(date: Date): string {
   const year = date.getFullYear();
@@ -44,7 +46,7 @@ function localDate(date: Date): string {
 
 function dateLabel(date: string | null): string {
   if (!date) return 'Not set';
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en', { timeZone: 'UTC' });
 }
 
 function SprintFormDialog({
@@ -60,6 +62,7 @@ function SprintFormDialog({
   onClose: () => void;
   onSubmit: (input: UpdateSprintRequest) => Promise<void>;
 }) {
+  const { t } = useLocale();
   const [name, setName] = useState(sprint?.name ?? suggestedName);
   const [goal, setGoal] = useState(sprint?.goal ?? '');
   const [startDate, setStartDate] = useState(sprint?.startDate ?? '');
@@ -72,11 +75,11 @@ function SprintFormDialog({
     if (pending) return;
 
     const validation: Record<string, string> = {};
-    if (!name.trim()) validation.name = 'Name is required.';
-    else if (name.trim().length > 80) validation.name = 'Name must be 80 characters or fewer.';
-    if (goal.length > 300) validation.goal = 'Goal must be 300 characters or fewer.';
+    if (!name.trim()) validation.name = t('Name is required.');
+    else if (name.trim().length > 80) validation.name = t('Name must be 80 characters or fewer.');
+    if (goal.length > 300) validation.goal = t('Goal must be 300 characters or fewer.');
     if (startDate && endDate && endDate < startDate) {
-      validation.endDate = 'End date must be on or after the start date.';
+      validation.endDate = t('End date must be on or after the start date.');
     }
     setErrors(validation);
     setServerError(null);
@@ -96,19 +99,19 @@ function SprintFormDialog({
       setErrors(fieldErrors);
       setServerError(Object.keys(fieldErrors).length
         ? null
-        : failure instanceof Error ? failure.message : 'Unable to save the Sprint.');
+        : failure instanceof Error ? failure.message : t('Unable to save the Sprint.'));
     }
   }
 
   return (
     <Dialog open onClose={pending ? undefined : onClose} fullWidth maxWidth="sm" aria-labelledby="sprint-form-title">
-      <DialogTitle id="sprint-form-title">{sprint ? 'Edit Sprint' : 'Create Sprint'}</DialogTitle>
+      <DialogTitle id="sprint-form-title">{t(sprint ? 'Edit Sprint' : 'Create Sprint')}</DialogTitle>
       <form onSubmit={handleSubmit} noValidate aria-busy={pending}>
         <DialogContent dividers>
           <Stack spacing={2}>
             {serverError ? <Alert severity="error" role="alert">{serverError}</Alert> : null}
             <TextField
-              label="Name"
+              label={t('Name')}
               required
               autoFocus
               fullWidth
@@ -119,7 +122,7 @@ function SprintFormDialog({
               slotProps={{ htmlInput: { maxLength: 80 } }}
             />
             <TextField
-              label="Goal"
+              label={t('Goal')}
               fullWidth
               multiline
               minRows={2}
@@ -131,7 +134,7 @@ function SprintFormDialog({
             />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
-                label="Start date"
+                label={t('Start date')}
                 type="date"
                 fullWidth
                 value={startDate}
@@ -141,7 +144,7 @@ function SprintFormDialog({
                 helperText={errors.startDate || ' '}
               />
               <TextField
-                label="End date"
+                label={t('End date')}
                 type="date"
                 fullWidth
                 value={endDate}
@@ -154,10 +157,10 @@ function SprintFormDialog({
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} disabled={pending}>Cancel</Button>
+          <Button onClick={onClose} disabled={pending}>{t('Cancel')}</Button>
           <Button type="submit" variant="contained" disabled={pending}>
             {pending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-            {sprint ? 'Save changes' : 'Create Sprint'}
+            {t(sprint ? 'Save changes' : 'Create Sprint')}
           </Button>
         </DialogActions>
       </form>
@@ -176,6 +179,7 @@ function StartSprintDialog({
   onClose: () => void;
   onSubmit: (input: { startDate: string; endDate: string }) => Promise<void>;
 }) {
+  const { t } = useLocale();
   const today = localDate(new Date());
   const twoWeeks = new Date();
   twoWeeks.setDate(twoWeeks.getDate() + 14);
@@ -188,9 +192,9 @@ function StartSprintDialog({
     event.preventDefault();
     if (pending) return;
     const validation: Record<string, string> = {};
-    if (!startDate) validation.startDate = 'Start date is required.';
-    if (!endDate) validation.endDate = 'End date is required.';
-    else if (startDate && endDate < startDate) validation.endDate = 'End date must be on or after the start date.';
+    if (!startDate) validation.startDate = t('Start date is required.');
+    if (!endDate) validation.endDate = t('End date is required.');
+    else if (startDate && endDate < startDate) validation.endDate = t('End date must be on or after the start date.');
     setErrors(validation);
     setServerError(null);
     if (Object.keys(validation).length) return;
@@ -202,19 +206,19 @@ function StartSprintDialog({
       setErrors(fieldErrors);
       setServerError(Object.keys(fieldErrors).length
         ? null
-        : failure instanceof Error ? failure.message : 'Unable to start this Sprint.');
+        : failure instanceof Error ? failure.message : t('Unable to start this Sprint.'));
     }
   }
 
   return (
     <Dialog open onClose={pending ? undefined : onClose} fullWidth maxWidth="sm" aria-labelledby="start-sprint-title">
-      <DialogTitle id="start-sprint-title">Start {sprint.name}</DialogTitle>
+      <DialogTitle id="start-sprint-title">{t('Start')} {sprint.name}</DialogTitle>
       <form onSubmit={handleSubmit} noValidate aria-busy={pending}>
         <DialogContent dividers>
           <Stack spacing={2}>
             {serverError ? <Alert severity="error" role="alert">{serverError}</Alert> : null}
             <TextField
-              label="Start date"
+              label={t('Start date')}
               type="date"
               required
               fullWidth
@@ -225,7 +229,7 @@ function StartSprintDialog({
               helperText={errors.startDate || ' '}
             />
             <TextField
-              label="End date"
+              label={t('End date')}
               type="date"
               required
               fullWidth
@@ -238,10 +242,10 @@ function StartSprintDialog({
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} disabled={pending}>Cancel</Button>
+          <Button onClick={onClose} disabled={pending}>{t('Cancel')}</Button>
           <Button type="submit" variant="contained" disabled={pending}>
             {pending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-            Start Sprint
+            {t('Start Sprint')}
           </Button>
         </DialogActions>
       </form>
@@ -259,6 +263,7 @@ function SprintTodoRow({
   onMoveToBacklog: () => void;
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const { t } = useLocale();
   return (
     <Paper variant="outlined" sx={{ p: 1.25, display: 'flex', alignItems: 'center', gap: 1 }}>
       <Button onClick={onOpen} sx={{ flex: 1, justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none' }}>
@@ -268,14 +273,14 @@ function SprintTodoRow({
         </Stack>
       </Button>
       <IconButton
-        aria-label={`More actions for ${todo.key}`}
+        aria-label={`${t('More actions for')} ${todo.key}`}
         aria-haspopup="menu"
         onClick={(event) => setAnchor(event.currentTarget)}
       >
         <MoreVertOutlined />
       </IconButton>
       <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
-        <MenuItem onClick={() => { setAnchor(null); onMoveToBacklog(); }}>Move to backlog</MenuItem>
+        <MenuItem onClick={() => { setAnchor(null); onMoveToBacklog(); }}>{t('Move to backlog')}</MenuItem>
       </Menu>
     </Paper>
   );
@@ -298,6 +303,7 @@ function SprintSection({
   onTodoOpen: (todo: Todo) => void;
   onTodoMoved: (todo: Todo) => void;
 }) {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState(sprint.status === 'active');
   const todosQuery = useQuery({
     queryKey: [...todosQueryKey(sprint.projectId), sprint.id],
@@ -324,10 +330,10 @@ function SprintSection({
               <Chip
                 size="small"
                 color={sprint.status === 'active' ? 'success' : sprint.status === 'completed' ? 'default' : 'primary'}
-                label={sprint.status}
+                label={t(sprint.status)}
               />
               <Typography variant="body2" color="text.secondary">
-                {sprint.stats.totalTodos} Todo{sprint.stats.totalTodos === 1 ? '' : 's'} · {sprint.stats.totalPoints} points
+                {sprint.stats.totalTodos} {t('Todos')} · {sprint.stats.totalPoints} {t('points')}
               </Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary">
@@ -337,31 +343,31 @@ function SprintSection({
         </AccordionSummary>
         <AccordionDetails id={`sprint-${sprint.id}-content`}>
           <Stack spacing={1.5}>
-            {sprint.goal ? <Typography color="text.secondary">{sprint.goal}</Typography> : <Typography color="text.secondary">No goal set.</Typography>}
+            {sprint.goal ? <Typography color="text.secondary">{sprint.goal}</Typography> : <Typography color="text.secondary">{t('No goal set.')}</Typography>}
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
               {pendingAction ? (
                 <>
-                  <Button size="small" onClick={onEdit}>Edit</Button>
-                  <Button size="small" color="error" onClick={() => { setDeleteError(null); setDeleteOpen(true); }}>Delete</Button>
-                  <Tooltip title={hasActiveSprint ? 'Complete the active Sprint before starting another.' : ''}>
+                  <Button size="small" onClick={onEdit}>{t('Edit')}</Button>
+                  <Button size="small" color="error" onClick={() => { setDeleteError(null); setDeleteOpen(true); }}>{t('Delete')}</Button>
+                  <Tooltip title={hasActiveSprint ? t('Complete the active Sprint before starting another.') : ''}>
                     <span>
-                      <Button size="small" variant="contained" disabled={hasActiveSprint} onClick={onStart}>Start Sprint</Button>
+                      <Button size="small" variant="contained" disabled={hasActiveSprint} onClick={onStart}>{t('Start Sprint')}</Button>
                     </span>
                   </Tooltip>
                   {hasActiveSprint ? (
                     <Typography variant="caption" color="text.secondary">
-                      Start is unavailable while another Sprint is active.
+                      {t('Start is unavailable while another Sprint is active.')}
                     </Typography>
                   ) : null}
                 </>
               ) : (
                 <Button size="small" onClick={() => navigate(`/projects/${sprint.projectId}/board`)}>
-                  Open board
+                  {t('Open board')}
                 </Button>
               )}
             </Stack>
-            {todosQuery.isError ? <Alert severity="error">Unable to load Todos for {sprint.name}.</Alert> : null}
-            {todosQuery.isLoading ? <CircularProgress size={22} /> : null}
+            {todosQuery.isError ? <ErrorState message={todosQuery.error instanceof Error ? todosQuery.error.message : t('Unable to load Todos for Sprint')} onRetry={() => void todosQuery.refetch()} /> : null}
+            {todosQuery.isLoading ? <LoadingState label="Loading Sprint Todos" rows={1} /> : null}
             {todosQuery.data?.todos.length ? (
               <Stack spacing={1}>
                 {todosQuery.data.todos.map((todo) => (
@@ -375,7 +381,7 @@ function SprintSection({
               </Stack>
             ) : null}
             {sprint.status !== 'completed' && !todosQuery.isLoading && !todosQuery.isError && !todosQuery.data?.todos.length ? (
-              <Typography color="text.secondary">No Todos assigned to this Sprint.</Typography>
+              <EmptyState title="No Todos assigned to this Sprint." />
             ) : null}
           </Stack>
         </AccordionDetails>
@@ -411,6 +417,7 @@ function DeleteSprintDialog({
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }) {
+  const { t } = useLocale();
   const [pending, setPending] = useState(false);
   async function confirm() {
     setPending(true);
@@ -422,18 +429,18 @@ function DeleteSprintDialog({
   }
   return (
     <Dialog open onClose={pending ? undefined : onClose} aria-labelledby="delete-sprint-title">
-      <DialogTitle id="delete-sprint-title">Delete {sprint.name}?</DialogTitle>
+      <DialogTitle id="delete-sprint-title">{t('Delete')} {sprint.name}?</DialogTitle>
       <DialogContent>
         <Stack spacing={1}>
-          <Typography>Delete this planned Sprint? Its Todos will be returned to the backlog.</Typography>
+          <Typography>{t('Delete this planned Sprint? Its Todos will be returned to the backlog.')}</Typography>
           {error ? <Alert severity="error" role="alert">{error}</Alert> : null}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={pending}>Cancel</Button>
+        <Button onClick={onClose} disabled={pending}>{t('Cancel')}</Button>
         <Button color="error" variant="contained" onClick={() => void confirm()} disabled={pending}>
           {pending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-          Delete Sprint
+          {t('Delete Sprint')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -447,6 +454,7 @@ export function SprintSections({
   projectId: string;
   onTodoOpen?: (todo: Todo) => void;
 }) {
+  const { t } = useLocale();
   const { data, isLoading, isError, error, refetch } = useSprints(projectId);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -540,77 +548,75 @@ export function SprintSections({
     else setSelectedTodo(todo);
   };
 
-  if (isLoading) return <CircularProgress size={24} aria-label="Loading Sprints" />;
-  if (isError) {
-    return (
-      <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void refetch()}>Retry</Button>}>
-        {error instanceof Error ? error.message : 'Unable to load Sprints.'}
-      </Alert>
-    );
-  }
+  if (isLoading) return <Paper variant="outlined" sx={{ p: { xs: 2, sm: 2.5 } }}><LoadingState label="Loading Sprints" rows={2} /></Paper>;
+  if (isError) return <ErrorState message={error instanceof Error ? error.message : 'Unable to load Sprints.'} onRetry={() => void refetch()} />;
 
   return (
-    <Stack spacing={1.5}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 1 }}>
-        <Box>
-          <Typography component="h2" variant="h3">Sprints</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {plannedSprints.length} planned Sprint{plannedSprints.length === 1 ? '' : 's'}
-            {hasActiveSprint ? ' · One active Sprint' : ''}
-          </Typography>
-        </Box>
-        <Button variant="outlined" startIcon={<AddOutlined />} onClick={() => { createMutation.reset(); setFormSprint(null); }}>
-          Create Sprint
-        </Button>
-      </Stack>
-
-      {sprints.length ? (
-        <Stack spacing={1}>
-          {sprints.map((sprint) => (
-            <SprintSection
-              key={sprint.id}
-              sprint={sprint}
-              onEdit={() => { updateMutation.reset(); setFormSprint(sprint); }}
-              onDelete={() => deletePlannedSprint(sprint)}
-              onStart={() => { startMutation.reset(); setStartSprintTarget(sprint); }}
-              hasActiveSprint={hasActiveSprint}
-              onTodoOpen={openTodo}
-              onTodoMoved={(todo) => moveMutation.mutate(todo)}
-            />
-          ))}
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, bgcolor: 'background.paper' }}>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 1 }}>
+          <Box>
+            <Typography component="h2" variant="h3">{t('Sprints')}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {plannedSprints.length} {t('planned Sprints')}
+              {hasActiveSprint ? ` · ${t('One active Sprint')}` : ''}
+            </Typography>
+          </Box>
+          <Button variant="outlined" startIcon={<AddOutlined />} onClick={() => { createMutation.reset(); setFormSprint(null); }}>
+            {t('Create Sprint')}
+          </Button>
         </Stack>
-      ) : (
-        <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography color="text.secondary">No Sprints yet. Create a Sprint to start planning.</Typography>
-        </Paper>
-      )}
 
-      {formSprint !== undefined ? (
-        <SprintFormDialog
-          key={formSprint?.id ?? 'new'}
-          sprint={formSprint ?? undefined}
-          suggestedName={`Sprint ${nextNumber}`}
-          pending={formPending}
-          onClose={() => setFormSprint(undefined)}
-          onSubmit={saveSprint}
-        />
-      ) : null}
-      {startSprintTarget ? (
-        <StartSprintDialog
-          sprint={startSprintTarget}
-          pending={startMutation.isPending}
-          onClose={() => setStartSprintTarget(null)}
-          onSubmit={startSelectedSprint}
-        />
-      ) : null}
-      {selectedTodo ? (
-        <TodoDetailsDialog
-          key={selectedTodo.id}
-          projectId={projectId}
-          todo={selectedTodo}
-          onClose={() => setSelectedTodo(null)}
-        />
-      ) : null}
-    </Stack>
+        {sprints.length ? (
+          <Stack spacing={1}>
+            {sprints.map((sprint) => (
+              <SprintSection
+                key={sprint.id}
+                sprint={sprint}
+                onEdit={() => { updateMutation.reset(); setFormSprint(sprint); }}
+                onDelete={() => deletePlannedSprint(sprint)}
+                onStart={() => { startMutation.reset(); setStartSprintTarget(sprint); }}
+                hasActiveSprint={hasActiveSprint}
+                onTodoOpen={openTodo}
+                onTodoMoved={(todo) => moveMutation.mutate(todo)}
+              />
+            ))}
+          </Stack>
+        ) : (
+          <EmptyState
+            title="No Sprints yet"
+            description="Create a Sprint to start planning."
+            action={<Button variant="contained" startIcon={<AddOutlined />} onClick={() => { createMutation.reset(); setFormSprint(null); }}>{t('Create Sprint')}</Button>}
+          />
+        )}
+
+        {formSprint !== undefined ? (
+          <SprintFormDialog
+            key={formSprint?.id ?? 'new'}
+            sprint={formSprint ?? undefined}
+            suggestedName={`Sprint ${nextNumber}`}
+            pending={formPending}
+            onClose={() => setFormSprint(undefined)}
+            onSubmit={saveSprint}
+          />
+        ) : null}
+        {startSprintTarget ? (
+          <StartSprintDialog
+            sprint={startSprintTarget}
+            pending={startMutation.isPending}
+            onClose={() => setStartSprintTarget(null)}
+            onSubmit={startSelectedSprint}
+          />
+        ) : null}
+        {selectedTodo ? (
+          <TodoDetailsDialog
+            key={selectedTodo.id}
+            projectId={projectId}
+            todo={selectedTodo}
+            onClose={() => setSelectedTodo(null)}
+          />
+        ) : null}
+      </Stack>
+    </Paper>
   );
 }

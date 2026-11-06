@@ -21,6 +21,8 @@ import {
   type TextFieldProps,
 } from '@mui/material';
 import kanbotLogo from '../../assets/kanbot-logo.svg';
+import InboxOutlined from '@mui/icons-material/InboxOutlined';
+import { useLocale } from '../../app/providers/use-locale';
 
 export function Button(props: ButtonProps) {
   return <MuiButton {...props} />;
@@ -135,20 +137,42 @@ export function Skeleton({ width = '100%', height = 20 }: { width?: number | str
 }
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  const { t } = useLocale();
   return (
-    <Box sx={{ textAlign: 'center', py: 5 }}>
-      <Typography variant="h3" gutterBottom>{title}</Typography>
-      {description ? <Typography color="text.secondary" sx={{ mb: 2 }}>{description}</Typography> : null}
+    <Box sx={{ textAlign: 'center', py: { xs: 3, sm: 4 }, px: 2, maxWidth: 520, mx: 'auto' }}>
+      <Box sx={{ width: 52, height: 52, display: 'grid', placeItems: 'center', borderRadius: '50%', bgcolor: 'action.hover', color: 'text.secondary', mx: 'auto', mb: 1.5 }}>
+        <InboxOutlined />
+      </Box>
+      <Typography variant="h3" gutterBottom>{t(title)}</Typography>
+      {description ? <Typography color="text.secondary" sx={{ mb: 2, maxWidth: 420, mx: 'auto' }}>{t(description)}</Typography> : null}
       {action}
     </Box>
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function LoadingState({ label = 'Loading', rows = 3 }: { label?: string; rows?: number }) {
+  const { t } = useLocale();
   return (
-    <Alert severity="error" action={onRetry ? <MuiButton color="inherit" size="small" onClick={onRetry}>Retry</MuiButton> : undefined}>
-      {message}
-    </Alert>
+    <Box role="status" aria-label={t(label)} aria-busy="true" sx={{ width: '100%', py: 1 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{t(label)}</Typography>
+      <Box sx={{ display: 'grid', gap: 1 }}>
+        {Array.from({ length: rows }, (_, index) => (
+          <MuiSkeleton key={index} variant="rounded" height={index === 0 ? 72 : 56} />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { t } = useLocale();
+  return (
+    <MuiCard variant="outlined" sx={{ borderColor: 'error.light' }}>
+      <CardContent sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+        <Alert severity="error" role="alert" sx={{ flex: 1, minWidth: 220, p: 0, bgcolor: 'transparent' }}>{t(message)}</Alert>
+        {onRetry ? <MuiButton color="error" variant="outlined" size="small" onClick={onRetry}>{t('Retry')}</MuiButton> : null}
+      </CardContent>
+    </MuiCard>
   );
 }
 

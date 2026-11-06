@@ -21,10 +21,12 @@ import { createSprint } from '../../sprints/api/sprints-api';
 import { sprintsQueryKey } from '../../sprints/hooks/use-sprints';
 import { todosQueryKey, useBacklog } from '../../todos/hooks/use-backlog';
 import { planSprint } from '../api/ai-api';
+import { useLocale } from '../../../app/providers/use-locale';
 
 const EMPTY_TODOS: Todo[] = [];
 
 export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const { t } = useLocale();
   const [capacity, setCapacity] = useState(30);
   const [focus, setFocus] = useState('');
   const [goal, setGoal] = useState('');
@@ -52,7 +54,7 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
     },
     onError: (failure: unknown) => setError(failure instanceof ApiError && failure.status === 429
       ? 'Too many requests. Please wait a moment.'
-      : failure instanceof Error ? failure.message : 'Unable to suggest a Sprint plan.'),
+      : failure instanceof Error ? failure.message : t('Unable to suggest a Sprint plan.')),
   });
 
   const createMutation = useMutation({
@@ -65,7 +67,7 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
       notify('Planned Sprint created.');
       onClose();
     },
-    onError: (failure: unknown) => setError(failure instanceof Error ? failure.message : 'Unable to create the Sprint.'),
+    onError: (failure: unknown) => setError(failure instanceof Error ? failure.message : t('Unable to create the Sprint.')),
   });
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -79,37 +81,44 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
 
   return (
     <Dialog open onClose={planMutation.isPending || createMutation.isPending ? undefined : onClose} fullWidth maxWidth="md">
-      <DialogTitle>Plan a Sprint with AI</DialogTitle>
+      <DialogTitle>{t('Plan a Sprint with AI')}</DialogTitle>
       <form onSubmit={submit}>
         <DialogContent dividers>
           <Stack spacing={2}>
             {error ? <Alert severity="error">{error}</Alert> : null}
-            {backlogQuery.isError ? <Alert severity="error">Unable to load backlog Todos for planning.</Alert> : null}
+            {backlogQuery.isLoading ? (
+              <Alert severity="info" icon={<CircularProgress size={18} />}>{t('Loading backlog for Sprint planning…')}</Alert>
+            ) : null}
+            {backlogQuery.isError ? (
+              <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void backlogQuery.refetch()}>{t('Retry')}</Button>}>
+                {t('Unable to load backlog Todos for planning.')}
+              </Alert>
+            ) : null}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
               <TextField
-                label="Capacity (story points)"
+                label={t('Capacity (story points)')}
                 type="number"
                 required
                 value={capacity}
                 onChange={(event) => setCapacity(Number(event.target.value))}
                 slotProps={{ htmlInput: { min: 1, max: 200 } }}
                 error={!Number.isInteger(capacity) || capacity < 1 || capacity > 200}
-                helperText="Enter 1–200 points."
+                helperText={t('Enter 1–200 points.')}
               />
-              <TextField label="Focus or objective (optional)" fullWidth value={focus} onChange={(event) => setFocus(event.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} />
+              <TextField label={t('Focus or objective (optional)')} fullWidth value={focus} onChange={(event) => setFocus(event.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} />
             </Stack>
             <Button type="submit" variant="outlined" disabled={planMutation.isPending || backlogQuery.isLoading || !Number.isInteger(capacity) || capacity < 1 || capacity > 200}>
               {planMutation.isPending ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}
-              Suggest plan
+              {t('Suggest plan')}
             </Button>
-            {planMutation.error instanceof ApiError && planMutation.error.status === 502 ? (
-              <Button onClick={() => planMutation.mutate()} disabled={planMutation.isPending}>Retry</Button>
+            {planMutation.error instanceof ApiError && (planMutation.error.status === 429 || planMutation.error.status === 502) ? (
+              <Button onClick={() => planMutation.mutate()} disabled={planMutation.isPending}>{t('Retry')}</Button>
             ) : null}
             {suggestedIds.length > 0 ? (
               <>
-                <TextField label="Suggested Sprint goal" required value={goal} onChange={(event) => setGoal(event.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} />
+                <TextField label={t('Suggested Sprint goal')} required value={goal} onChange={(event) => setGoal(event.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} />
                 <Typography variant="body2" color={selectedPoints > capacity ? 'error.main' : 'text.secondary'}>
-                  Selected: {selectedPoints} / {capacity} story points
+                  {t('Selected')}: {selectedPoints} / {capacity} {t('story points')}
                 </Typography>
                 <Stack spacing={0.75}>
                   {suggestedIds.map((id) => {
@@ -127,15 +136,15 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
                 <Alert severity="info">{reasoning}</Alert>
               </>
             ) : null}
-            <Typography variant="caption" color="text.secondary">AI can make mistakes. Review before saving.</Typography>
+            <Typography variant="caption" color="text.secondary">{t('AI can make mistakes. Review before saving.')}</Typography>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} disabled={planMutation.isPending || createMutation.isPending}>Cancel</Button>
+          <Button onClick={onClose} disabled={planMutation.isPending || createMutation.isPending}>{t('Cancel')}</Button>
           {suggestedIds.length > 0 ? (
             <Button type="button" variant="contained" disabled={!canCreate} onClick={() => createMutation.mutate()}>
               {createMutation.isPending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-              Create Sprint
+              {t('Create Sprint')}
             </Button>
           ) : null}
         </DialogActions>

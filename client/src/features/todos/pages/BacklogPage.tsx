@@ -21,7 +21,6 @@ import {
   MenuItem,
   Paper,
   Select,
-  Skeleton,
   Stack,
   TextField,
   Tooltip,
@@ -30,7 +29,7 @@ import {
 import { useParams } from 'react-router-dom';
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { ApiError } from '../../../shared/api/errors';
-import { ErrorState } from '../../../shared/components/ui';
+import { EmptyState, ErrorState, LoadingState } from '../../../shared/components/ui';
 import type { Sprint, Todo, TodoPriority, TodoType } from '../../../shared/types/api';
 import { TODO_PRIORITIES, TODO_TYPES } from '../../../shared/types/api';
 import { createTodo, moveTodo, updateTodo } from '../api/todos-api';
@@ -39,6 +38,7 @@ import { TodoDetailsDialog } from '../components/TodoDetailsDialog';
 import { backlogQueryKey, todosQueryKey, useBacklog } from '../hooks/use-backlog';
 import { SprintSections } from '../../sprints/components/SprintSections';
 import { useSprints } from '../../sprints/hooks/use-sprints';
+import { useLocale } from '../../../app/providers/use-locale';
 
 const priorityColors: Record<TodoPriority, 'default' | 'info' | 'warning' | 'error'> = {
   low: 'info',
@@ -69,6 +69,7 @@ function TodoRow({
   sprints: Sprint[];
   onAssign: (sprintId: string) => void;
 }) {
+  const { t } = useLocale();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: todo.id,
@@ -93,14 +94,13 @@ function TodoRow({
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.45 : 1,
-        '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
       }}
     >
-      <Tooltip title={disabled ? 'Clear search and filters to drag reorder' : 'Drag to reorder'}>
+      <Tooltip title={t(disabled ? 'Clear search and filters to drag reorder' : 'Drag to reorder')}>
         <span>
           <IconButton
             size="small"
-            aria-label={`Reorder ${todo.key}`}
+            aria-label={`${t('Reorder')} ${todo.key}`}
             disabled={disabled}
             {...attributes}
             {...listeners}
@@ -151,7 +151,7 @@ function TodoRow({
         </Stack>
       </Box>
       <IconButton
-        aria-label={`More actions for ${todo.key}`}
+        aria-label={`${t('More actions for')} ${todo.key}`}
         aria-haspopup="menu"
         onClick={(event) => {
           stop(event);
@@ -175,7 +175,7 @@ function TodoRow({
             onMove(0);
           }}
         >
-          Move to top
+          {t('Move to top')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -183,9 +183,9 @@ function TodoRow({
             onMove(Number.MAX_SAFE_INTEGER);
           }}
         >
-          Move to bottom
+          {t('Move to bottom')}
         </MenuItem>
-        {sprints.length ? <MenuItem disabled>Move to Sprint</MenuItem> : null}
+        {sprints.length ? <MenuItem disabled>{t('Move to Sprint')}</MenuItem> : null}
         {sprints.map((sprint) => (
           <MenuItem
             key={sprint.id}
@@ -194,7 +194,7 @@ function TodoRow({
               onAssign(sprint.id);
             }}
           >
-            {sprint.name}{sprint.status === 'active' ? ' (Active)' : ''}
+            {sprint.name}{sprint.status === 'active' ? ` (${t('Active')})` : ''}
           </MenuItem>
         ))}
       </Menu>
@@ -204,6 +204,7 @@ function TodoRow({
 
 export function BacklogPage() {
   const { projectId = '' } = useParams();
+  const { t } = useLocale();
   const { data, isLoading, isError, error, refetch } = useBacklog(projectId);
   const sprintsQuery = useSprints(projectId);
   const openSprints: Sprint[] = sprintsQuery.data?.sprints.filter(
@@ -332,11 +333,7 @@ export function BacklogPage() {
   }
 
   if (isLoading) {
-    return (
-      <Stack spacing={1}>
-        {[0, 1, 2, 3].map((item) => <Skeleton key={item} height={88} />)}
-      </Stack>
-    );
+    return <LoadingState label="Loading backlog" rows={4} />;
   }
 
   if (isError) {
@@ -352,129 +349,141 @@ export function BacklogPage() {
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2 }}>
         <Box>
-          <Typography component="h1" variant="h2">Backlog</Typography>
+          <Typography component="h1" variant="h2">{t('Backlog')}</Typography>
           <Typography color="text.secondary">
             {todos.length} Todo{todos.length === 1 ? '' : 's'} · {totalPoints} story point{totalPoints === 1 ? '' : 's'}
             {filtersActive ? ` · Showing ${filteredTodos.length}` : ''}
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-          <Button variant="outlined" startIcon={<AutoAwesomeOutlined />} onClick={() => setGenerateOpen(true)}>
-            Generate Todos with AI
+          <Button variant="ai" startIcon={<AutoAwesomeOutlined />} onClick={() => setGenerateOpen(true)}>
+            {t('Generate Todos with AI')}
           </Button>
           <Button variant="contained" startIcon={<AddOutlined />} onClick={() => quickInput.current?.focus()}>
-            Create Todo
+            {t('Create a Todo')}
           </Button>
         </Stack>
       </Stack>
 
-      <SprintSections projectId={projectId} onTodoOpen={setSelectedTodo} />
-
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-        <TextField
-          label="Search backlog"
-          placeholder="Key, title, description, or label"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          fullWidth
-          size="small"
-        />
-        <FormControl size="small" sx={{ minWidth: { md: 170 } }}>
-          <InputLabel id="backlog-priority-label">Priority</InputLabel>
-          <Select
-            labelId="backlog-priority-label"
-            label="Priority"
-            value={priorityFilter}
-            onChange={(event) => setPriorityFilter(event.target.value as TodoPriority | '')}
-          >
-            <MenuItem value="">All priorities</MenuItem>
-            {TODO_PRIORITIES.map((priority) => <MenuItem key={priority} value={priority}>{labelFor(priority)}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: { md: 150 } }}>
-          <InputLabel id="backlog-type-label">Type</InputLabel>
-          <Select
-            labelId="backlog-type-label"
-            label="Type"
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value as TodoType | '')}
-          >
-            <MenuItem value="">All types</MenuItem>
-            {TODO_TYPES.map((type) => <MenuItem key={type} value={type}>{labelFor(type)}</MenuItem>)}
-          </Select>
-        </FormControl>
-      </Stack>
-
-      {filtersActive ? (
-        <Alert severity="info">
-          Drag reordering is disabled while search or filters are active. Clear them to reorder the backlog.
-        </Alert>
-      ) : null}
-
-      {todos.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-          <Typography component="h2" variant="h3" gutterBottom>Your backlog is empty</Typography>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
-            Create a Todo or get a first draft from AI.
-          </Typography>
-          <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Button variant="contained" onClick={() => quickInput.current?.focus()}>Create a Todo</Button>
-            <Button variant="outlined" startIcon={<AutoAwesomeOutlined />} onClick={() => setGenerateOpen(true)}>
-              Generate Todos with AI
-            </Button>
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: 'minmax(0, 1fr)', xl: 'minmax(0, 1.8fr) minmax(320px, .8fr)' },
+        gridTemplateAreas: { xs: '"backlog" "sprints"', xl: '"backlog sprints"' },
+        alignItems: 'start',
+        gap: 2,
+      }}>
+        <Box sx={{ gridArea: 'sprints', minWidth: 0 }}>
+          <SprintSections projectId={projectId} onTodoOpen={setSelectedTodo} />
+        </Box>
+        <Stack spacing={1.5} sx={{ gridArea: 'backlog', minWidth: 0 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+            <TextField
+              label={t('Search backlog')}
+              placeholder={t('Key, title, description, or label')}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              fullWidth
+              size="small"
+            />
+            <FormControl size="small" sx={{ minWidth: { md: 170 } }}>
+              <InputLabel id="backlog-priority-label">{t('Priority')}</InputLabel>
+              <Select
+                labelId="backlog-priority-label"
+                label={t('Priority')}
+                value={priorityFilter}
+                onChange={(event) => setPriorityFilter(event.target.value as TodoPriority | '')}
+              >
+                <MenuItem value="">{t('All priorities')}</MenuItem>
+                {TODO_PRIORITIES.map((priority) => <MenuItem key={priority} value={priority}>{t(labelFor(priority))}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: { md: 150 } }}>
+              <InputLabel id="backlog-type-label">{t('Type')}</InputLabel>
+              <Select
+                labelId="backlog-type-label"
+                label={t('Type')}
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value as TodoType | '')}
+              >
+                <MenuItem value="">{t('All types')}</MenuItem>
+                {TODO_TYPES.map((type) => <MenuItem key={type} value={type}>{t(labelFor(type))}</MenuItem>)}
+              </Select>
+            </FormControl>
           </Stack>
-        </Paper>
-      ) : filteredTodos.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-          <Typography component="h2" variant="h3" gutterBottom>No matching Todos</Typography>
-          <Typography color="text.secondary">Try a different search or clear the filters.</Typography>
-        </Paper>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={filteredTodos.map((todo) => todo.id)} strategy={verticalListSortingStrategy}>
-            <Stack spacing={1}>
-              {filteredTodos.map((todo) => (
-                <TodoRow
-                  key={todo.id}
-                  todo={todo}
-                  index={todos.findIndex((item) => item.id === todo.id)}
-                  disabled={filtersActive || reorderMutation.isPending}
-                  onOpen={() => setSelectedTodo(todo)}
-                  onMove={(position) => moveToPosition(todo, position)}
-                  sprints={openSprints}
-                  onAssign={(sprintId) => assignMutation.mutate({ todo, sprintId })}
-                />
-              ))}
-            </Stack>
-          </SortableContext>
-        </DndContext>
-      )}
 
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-          <TextField
-            inputRef={quickInput}
-            fullWidth
-            size="small"
-            placeholder="+ Create todo"
-            slotProps={{ htmlInput: { 'aria-label': 'Create todo' } }}
-            value={quickTitle}
-            onChange={(event) => {
-              setQuickTitle(event.target.value);
-              setQuickError(null);
-            }}
-            onKeyDown={handleQuickKeyDown}
-            error={Boolean(quickError)}
-            helperText={quickError ?? (createMutation.isPending ? 'Creating Todo…' : 'Press Enter to create · Escape to cancel')}
-            disabled={createMutation.isPending}
-          />
-          {createMutation.isPending ? <CircularProgress size={24} sx={{ mt: 1 }} /> : null}
+          {filtersActive ? (
+            <Alert severity="info">
+              {t('Drag reordering is disabled while search or filters are active. Clear them to reorder the backlog.')}
+            </Alert>
+          ) : null}
+
+          {todos.length === 0 ? (
+            <Paper variant="outlined">
+              <EmptyState
+                title="Your backlog is empty"
+                description="Create a Todo or get a first draft from AI."
+                action={(
+                  <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Button variant="contained" onClick={() => quickInput.current?.focus()}>{t('Create a Todo')}</Button>
+                    <Button variant="ai" startIcon={<AutoAwesomeOutlined />} onClick={() => setGenerateOpen(true)}>
+                      {t('Generate Todos with AI')}
+                    </Button>
+                  </Stack>
+                )}
+              />
+            </Paper>
+          ) : filteredTodos.length === 0 ? (
+            <Paper variant="outlined">
+              <EmptyState title="No matching Todos" description="Try a different search or clear the filters." />
+            </Paper>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={filteredTodos.map((todo) => todo.id)} strategy={verticalListSortingStrategy}>
+                <Stack spacing={1}>
+                  {filteredTodos.map((todo) => (
+                    <TodoRow
+                      key={todo.id}
+                      todo={todo}
+                      index={todos.findIndex((item) => item.id === todo.id)}
+                      disabled={filtersActive || reorderMutation.isPending}
+                      onOpen={() => setSelectedTodo(todo)}
+                      onMove={(position) => moveToPosition(todo, position)}
+                      sprints={openSprints}
+                      onAssign={(sprintId) => assignMutation.mutate({ todo, sprintId })}
+                    />
+                  ))}
+                </Stack>
+              </SortableContext>
+            </DndContext>
+          )}
+
+          <Paper variant="outlined" sx={{ p: 1.5 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+              <TextField
+                inputRef={quickInput}
+                fullWidth
+                size="small"
+                placeholder={t('+ Create todo')}
+                slotProps={{ htmlInput: { 'aria-label': t('Create todo') } }}
+                value={quickTitle}
+                onChange={(event) => {
+                  setQuickTitle(event.target.value);
+                  setQuickError(null);
+                }}
+                onKeyDown={handleQuickKeyDown}
+                error={Boolean(quickError)}
+                helperText={quickError ?? (createMutation.isPending ? t('Creating Todo…') : t('Press Enter to create · Escape to cancel'))}
+                disabled={createMutation.isPending}
+              />
+              {createMutation.isPending ? <CircularProgress size={24} sx={{ mt: 1 }} /> : null}
+            </Stack>
+          </Paper>
         </Stack>
-      </Paper>
+      </Box>
 
       {selectedTodo ? (
         <TodoDetailsDialog

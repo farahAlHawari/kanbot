@@ -24,6 +24,7 @@ import type { Sprint, StoryPoints, Todo, TodoPriority, TodoStatus, TodoType, Upd
 import { STORY_POINTS, TODO_PRIORITIES, TODO_STATUSES, TODO_TYPES } from '../../../shared/types/api';
 import { deleteTodo, updateTodo } from '../api/todos-api';
 import { todosQueryKey } from '../hooks/use-backlog';
+import { useLocale } from '../../../app/providers/use-locale';
 
 interface TodoFields {
   title: string;
@@ -68,6 +69,7 @@ export function TodoDetailsDialog({
   todo: Todo;
   onClose: () => void;
 }) {
+  const { t } = useLocale();
   const initialFields = getFields(todo);
   const [fields, setFields] = useState(initialFields);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -101,7 +103,7 @@ export function TodoDetailsDialog({
       setErrors(Object.fromEntries(
         Object.entries(fieldErrors).map(([field, message]) => [field.split('.')[0], message]),
       ));
-      setServerError(Object.keys(fieldErrors).length ? null : error instanceof Error ? error.message : 'Unable to save this Todo.');
+      setServerError(Object.keys(fieldErrors).length ? null : error instanceof Error ? error.message : t('Unable to save this Todo.'));
     },
   });
 
@@ -136,7 +138,7 @@ export function TodoDetailsDialog({
       if (context?.previousBacklog) {
         queryClient.setQueryData([...todosQueryKey(projectId), 'backlog'], context.previousBacklog);
       }
-      setServerError(error instanceof Error ? error.message : 'Unable to delete this Todo.');
+      setServerError(error instanceof Error ? error.message : t('Unable to delete this Todo.'));
       setDeleteOpen(false);
     },
   });
@@ -167,11 +169,11 @@ export function TodoDetailsDialog({
       return;
     }
     if (label.length > 30) {
-      setErrors((current) => ({ ...current, labels: 'Each label must be 30 characters or fewer.' }));
+      setErrors((current) => ({ ...current, labels: t('Each label must be 30 characters or fewer.') }));
       return;
     }
     if (fields.labels.length >= 10) {
-      setErrors((current) => ({ ...current, labels: 'A Todo can have at most 10 labels.' }));
+      setErrors((current) => ({ ...current, labels: t('A Todo can have at most 10 labels.') }));
       return;
     }
     setField('labels', [...fields.labels, label]);
@@ -183,11 +185,11 @@ export function TodoDetailsDialog({
     if (pending) return;
 
     const validation: Record<string, string> = {};
-    if (!fields.title.trim()) validation.title = 'Title is required.';
-    else if (fields.title.trim().length > 200) validation.title = 'Title must be 200 characters or fewer.';
-    if (fields.description.length > 5000) validation.description = 'Description must be 5000 characters or fewer.';
+    if (!fields.title.trim()) validation.title = t('Title is required.');
+    else if (fields.title.trim().length > 200) validation.title = t('Title must be 200 characters or fewer.');
+    if (fields.description.length > 5000) validation.description = t('Description must be 5000 characters or fewer.');
     if (fields.labels.length > 10 || fields.labels.some((label) => label.length > 30)) {
-      validation.labels = 'Use at most 10 labels, each 30 characters or fewer.';
+      validation.labels = t('Use at most 10 labels, each 30 characters or fewer.');
     }
     setErrors(validation);
     setServerError(null);
@@ -219,17 +221,24 @@ export function TodoDetailsDialog({
       >
         <DialogTitle id="todo-details-title">
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{todo.key}</Typography>
-          Todo details
+          {t('Todo details')}
         </DialogTitle>
         <form onSubmit={handleSubmit} noValidate>
           <DialogContent dividers>
             <Stack spacing={2}>
               {serverError ? <Alert severity="error" role="alert">{serverError}</Alert> : null}
+              {sprintsQuery.isLoading ? <Alert severity="info">{t('Loading available Sprints…')}</Alert> : null}
               {sprintsQuery.isError ? (
-                <Alert severity="warning">Available sprints could not be loaded. Refresh before changing sprint assignment.</Alert>
+                <Alert
+                  severity="warning"
+                  role="alert"
+                  action={<Button color="inherit" size="small" onClick={() => void sprintsQuery.refetch()}>{t('Retry')}</Button>}
+                >
+                  {t('Available sprints could not be loaded. Refresh before changing sprint assignment.')}
+                </Alert>
               ) : null}
               <TextField
-                label="Title"
+                label={t('Title')}
                 required
                 autoFocus
                 fullWidth
@@ -239,7 +248,7 @@ export function TodoDetailsDialog({
                 helperText={errors.title || ' '}
               />
               <TextField
-                label="Description"
+                label={t('Description')}
                 fullWidth
                 multiline
                 minRows={4}
@@ -250,58 +259,58 @@ export function TodoDetailsDialog({
               />
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <FormControl fullWidth>
-                  <InputLabel id="todo-type-label">Type</InputLabel>
+                  <InputLabel id="todo-type-label">{t('Type')}</InputLabel>
                   <Select
                     labelId="todo-type-label"
-                    label="Type"
+                    label={t('Type')}
                     value={fields.type}
                     onChange={(event) => setField('type', event.target.value as TodoType)}
                   >
-                    {TODO_TYPES.map((type) => <MenuItem key={type} value={type}>{displayLabel(type)}</MenuItem>)}
+                    {TODO_TYPES.map((type) => <MenuItem key={type} value={type}>{t(displayLabel(type))}</MenuItem>)}
                   </Select>
                 </FormControl>
                 <FormControl fullWidth error={Boolean(errors.status)}>
-                  <InputLabel id="todo-status-label">Status</InputLabel>
+                  <InputLabel id="todo-status-label">{t('Status')}</InputLabel>
                   <Select
                     labelId="todo-status-label"
-                    label="Status"
+                    label={t('Status')}
                     value={fields.status}
                     onChange={(event) => setField('status', event.target.value as TodoStatus)}
                   >
-                    {TODO_STATUSES.map((status) => <MenuItem key={status} value={status}>{displayLabel(status)}</MenuItem>)}
+                    {TODO_STATUSES.map((status) => <MenuItem key={status} value={status}>{t(displayLabel(status))}</MenuItem>)}
                   </Select>
                   {errors.status ? <Typography variant="caption" color="error">{errors.status}</Typography> : null}
                 </FormControl>
                 <FormControl fullWidth>
-                  <InputLabel id="todo-priority-label">Priority</InputLabel>
+                  <InputLabel id="todo-priority-label">{t('Priority')}</InputLabel>
                   <Select
                     labelId="todo-priority-label"
-                    label="Priority"
+                    label={t('Priority')}
                     value={fields.priority}
                     onChange={(event) => setField('priority', event.target.value as TodoPriority)}
                   >
-                    {TODO_PRIORITIES.map((priority) => <MenuItem key={priority} value={priority}>{displayLabel(priority)}</MenuItem>)}
+                    {TODO_PRIORITIES.map((priority) => <MenuItem key={priority} value={priority}>{t(displayLabel(priority))}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Stack>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <FormControl fullWidth>
-                  <InputLabel id="todo-points-label">Story points</InputLabel>
+                  <InputLabel id="todo-points-label">{t('Story points')}</InputLabel>
                   <Select
                     labelId="todo-points-label"
-                    label="Story points"
+                    label={t('Story points')}
                     value={fields.storyPoints === null ? '' : String(fields.storyPoints)}
                     onChange={(event) => setField(
                       'storyPoints',
                       event.target.value === '' ? null : Number(event.target.value) as StoryPoints,
                     )}
                   >
-                    <MenuItem value=""><em>None</em></MenuItem>
+                    <MenuItem value=""><em>{t('None')}</em></MenuItem>
                     {STORY_POINTS.map((points) => <MenuItem key={points} value={String(points)}>{points}</MenuItem>)}
                   </Select>
                 </FormControl>
                 <TextField
-                  label="Due date"
+                  label={t('Due date')}
                   type="date"
                   fullWidth
                   value={fields.dueDate}
@@ -311,18 +320,18 @@ export function TodoDetailsDialog({
                   helperText={errors.dueDate || ' '}
                 />
                 <FormControl fullWidth error={Boolean(errors.sprintId)}>
-                  <InputLabel id="todo-sprint-label">Sprint</InputLabel>
+                  <InputLabel id="todo-sprint-label">{t('Sprint')}</InputLabel>
                   <Select
                     labelId="todo-sprint-label"
-                    label="Sprint"
+                    label={t('Sprint')}
                     value={fields.sprintId}
-                    disabled={sprintsQuery.isError}
+                    disabled={sprintsQuery.isError || sprintsQuery.isLoading}
                     onChange={(event) => setField('sprintId', event.target.value)}
                   >
-                    <MenuItem value="">Backlog</MenuItem>
+                    <MenuItem value="">{t('Backlog')}</MenuItem>
                     {sprints.filter((sprint) => sprint.status === 'planned' || sprint.status === 'active').map((sprint) => (
                       <MenuItem key={sprint.id} value={sprint.id}>
-                        {sprint.name}{sprint.status === 'active' ? ' (Active)' : ''}
+                        {sprint.name}{sprint.status === 'active' ? ` (${t('Active')})` : ''}
                       </MenuItem>
                     ))}
                   </Select>
@@ -332,7 +341,7 @@ export function TodoDetailsDialog({
               <Stack spacing={1}>
                 <Stack direction="row" spacing={1}>
                   <TextField
-                    label="Add label"
+                    label={t('Add label')}
                     size="small"
                     fullWidth
                     value={labelInput}
@@ -346,7 +355,7 @@ export function TodoDetailsDialog({
                     error={Boolean(errors.labels)}
                     helperText={errors.labels || ' '}
                   />
-                  <Button onClick={addLabel} disabled={!labelInput.trim()}>Add</Button>
+                  <Button onClick={addLabel} disabled={!labelInput.trim()}>{t('Add')}</Button>
                 </Stack>
                 <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                   {fields.labels.map((label) => (
@@ -357,12 +366,12 @@ export function TodoDetailsDialog({
             </Stack>
           </DialogContent>
           <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>
-            <Button color="error" onClick={() => setDeleteOpen(true)} disabled={pending}>Delete Todo</Button>
+            <Button color="error" onClick={() => setDeleteOpen(true)} disabled={pending}>{t('Delete Todo')}</Button>
             <Stack direction="row" spacing={1}>
-              <Button onClick={requestClose} disabled={pending}>Cancel</Button>
+              <Button onClick={requestClose} disabled={pending}>{t('Cancel')}</Button>
               <Button type="submit" variant="contained" disabled={pending}>
                 {saveMutation.isPending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-                Save
+                {t('Save')}
               </Button>
             </Stack>
           </DialogActions>
@@ -370,24 +379,24 @@ export function TodoDetailsDialog({
       </Dialog>
 
       <Dialog open={discardOpen} onClose={() => setDiscardOpen(false)} aria-labelledby="discard-todo-title">
-        <DialogTitle id="discard-todo-title">Discard changes?</DialogTitle>
-        <DialogContent><Typography>Your unsaved changes will be lost.</Typography></DialogContent>
+        <DialogTitle id="discard-todo-title">{t('Discard changes?')}</DialogTitle>
+        <DialogContent><Typography>{t('Your unsaved changes will be lost.')}</Typography></DialogContent>
         <DialogActions>
-          <Button onClick={() => setDiscardOpen(false)}>Keep editing</Button>
-          <Button color="error" onClick={onClose}>Discard changes</Button>
+          <Button onClick={() => setDiscardOpen(false)}>{t('Keep editing')}</Button>
+          <Button color="error" onClick={onClose}>{t('Discard changes')}</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} aria-labelledby="delete-todo-title">
-        <DialogTitle id="delete-todo-title">Delete Todo?</DialogTitle>
+        <DialogTitle id="delete-todo-title">{t('Delete Todo?')}</DialogTitle>
         <DialogContent>
-          <Typography>Delete {todo.key} — {todo.title}? This cannot be undone.</Typography>
+          <Typography>{t('Delete')} {todo.key} — {todo.title}? {t('This cannot be undone.')}</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteOpen(false)} disabled={deleteMutation.isPending}>Cancel</Button>
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleteMutation.isPending}>{t('Cancel')}</Button>
           <Button color="error" variant="contained" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
             {deleteMutation.isPending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-            Delete Todo
+            {t('Delete Todo')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,24 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, CardContent, Chip, CircularProgress, LinearProgress, Paper, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Chip, LinearProgress, Paper, Stack, Typography } from '@mui/material';
 import { Link, useParams } from 'react-router-dom';
 import { getSprint } from '../api/sprints-api';
 import { listTodos } from '../../todos/api/todos-api';
 import type { SprintStats, Todo } from '../../../shared/types/api';
 import { SprintSummaryPanel } from '../../ai-assistant/components/SprintSummaryPanel';
+import { EmptyState, ErrorState, LoadingState } from '../../../shared/components/ui';
+import { useLocale } from '../../../app/providers/use-locale';
 
 function dateLabel(date: string | null) {
-  return date ? new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : 'Not set';
+  return date
+    ? new Date(`${date}T00:00:00Z`).toLocaleDateString('en', { timeZone: 'UTC' })
+    : 'Not set';
 }
 
 function TodoItem({ todo }: { todo: Todo }) {
+  const { t } = useLocale();
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }}>
       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{todo.key}</Typography>
       <Typography sx={{ fontWeight: 600 }}>{todo.title}</Typography>
       <Stack direction="row" spacing={0.75} sx={{ mt: 0.75 }}>
-        <Chip size="small" variant="outlined" label={todo.type} />
-        <Chip size="small" label={todo.priority} />
-        {todo.storyPoints !== null ? <Chip size="small" variant="outlined" label={`${todo.storyPoints} pts`} /> : null}
+        <Chip size="small" variant="outlined" label={t(todo.type)} />
+        <Chip size="small" label={t(todo.priority)} />
+        {todo.storyPoints !== null ? <Chip size="small" variant="outlined" label={`${todo.storyPoints} ${t('points')}`} /> : null}
       </Stack>
     </Paper>
   );
@@ -26,6 +31,7 @@ function TodoItem({ todo }: { todo: Todo }) {
 
 export function SprintDetailsPage() {
   const { projectId = '', sprintId = '' } = useParams();
+  const { t } = useLocale();
   const sprintQuery = useQuery({
     queryKey: ['sprint', sprintId],
     queryFn: () => getSprint(sprintId),
@@ -37,14 +43,8 @@ export function SprintDetailsPage() {
     enabled: Boolean(projectId && sprintId && sprintQuery.data),
   });
 
-  if (sprintQuery.isLoading) return <CircularProgress aria-label="Loading Sprint details" />;
-  if (sprintQuery.isError || !sprintQuery.data?.sprint) {
-    return (
-      <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void sprintQuery.refetch()}>Retry</Button>}>
-        {sprintQuery.error instanceof Error ? sprintQuery.error.message : 'Unable to load Sprint details.'}
-      </Alert>
-    );
-  }
+  if (sprintQuery.isLoading) return <LoadingState label="Loading Sprint details" rows={3} />;
+  if (sprintQuery.isError || !sprintQuery.data?.sprint) return <ErrorState message={sprintQuery.error instanceof Error ? sprintQuery.error.message : 'Unable to load Sprint details.'} onRetry={() => void sprintQuery.refetch()} />;
 
   const sprint = sprintQuery.data.sprint;
   const historicalStats = sprint.status === 'completed' ? sprint.completedStats : null;
@@ -59,24 +59,33 @@ export function SprintDetailsPage() {
       <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1 }}>
         <Stack>
           <Typography component="h1" variant="h2">{sprint.name}</Typography>
-          <Typography color="text.secondary">{sprint.goal || 'No goal set.'}</Typography>
+          <Typography color="text.secondary">{sprint.goal || t('No goal set.')}</Typography>
         </Stack>
         <Stack direction="row" spacing={1}>
           <Chip color={sprint.status === 'active' ? 'success' : sprint.status === 'planned' ? 'primary' : 'default'} label={sprint.status} />
-          <Button component={Link} to={`/projects/${projectId}/sprints`}>Sprint history</Button>
+          <Button component={Link} to={`/projects/${projectId}/sprints`}>{t('Sprint history')}</Button>
         </Stack>
       </Stack>
 
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={1.5}>
-            <Typography>Dates: {dateLabel(sprint.startDate)} – {dateLabel(sprint.endDate)}</Typography>
-            <Typography>Total Todos: {stats.totalTodos}</Typography>
-            <Typography>Completed Todos: {stats.doneTodos}</Typography>
-            <Typography>Completed story points: {stats.donePoints} / {stats.totalPoints}</Typography>
-            {sprint.status === 'completed' ? <Typography>Carried-over Todos: {carriedOver}</Typography> : null}
-            <Typography>Completion: {percentage}%</Typography>
-            <LinearProgress variant="determinate" value={percentage} aria-label="Sprint completion" />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1.5 }}>
+              {[
+                { label: t('Dates'), value: `${dateLabel(sprint.startDate)} – ${dateLabel(sprint.endDate)}` },
+                { label: t('Total Todos'), value: stats.totalTodos },
+                { label: t('Completed Todos'), value: stats.doneTodos },
+                { label: t('Completed story points'), value: `${stats.donePoints} / ${stats.totalPoints}` },
+                ...(sprint.status === 'completed' ? [{ label: t('Carried-over Todos'), value: carriedOver }] : []),
+                { label: t('Completion'), value: `${percentage}%` },
+              ].map(({ label, value }) => (
+                <Box key={label} sx={{ minWidth: 0, p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.subtle' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>{label}</Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{value}</Typography>
+                </Box>
+              ))}
+            </Box>
+            <LinearProgress variant="determinate" value={percentage} aria-label={t('Sprint completion')} />
           </Stack>
         </CardContent>
       </Card>
@@ -84,10 +93,10 @@ export function SprintDetailsPage() {
       {sprint.status !== 'planned' ? <SprintSummaryPanel sprint={sprint} projectId={projectId} /> : null}
 
       <Stack spacing={1}>
-        <Typography component="h2" variant="h3">{sprint.status === 'completed' ? 'Completed Todos' : 'Todos'}</Typography>
-        {todosQuery.isLoading ? <CircularProgress aria-label="Loading Sprint Todos" /> : null}
+        <Typography component="h2" variant="h3">{sprint.status === 'completed' ? t('Completed Todos') : t('Todos')}</Typography>
+        {todosQuery.isLoading ? <LoadingState label="Loading Sprint Todos" rows={2} /> : null}
         {todosQuery.isError ? (
-          <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void todosQuery.refetch()}>Retry</Button>}>
+          <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void todosQuery.refetch()}>{t('Retry')}</Button>}>
             {todosQuery.error instanceof Error ? todosQuery.error.message : 'Unable to load Sprint Todos.'}
           </Alert>
         ) : null}
@@ -95,7 +104,7 @@ export function SprintDetailsPage() {
           displayedTodos.map((todo) => <TodoItem key={todo.id} todo={todo} />)
         ) : null}
         {!todosQuery.isLoading && !todosQuery.isError && !displayedTodos.length ? (
-          <Typography color="text.secondary">No Todos in this Sprint.</Typography>
+          <Paper variant="outlined"><EmptyState title="No Todos in this Sprint." /></Paper>
         ) : null}
       </Stack>
     </Stack>

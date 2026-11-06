@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Box, CircularProgress } from '@mui/material';
+import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import kanbotIcon from '../../assets/brand/kanbot-icon.svg';
 import { configureApiAuth } from '../../shared/api/api-client';
 import { ApiError } from '../../shared/api/errors';
 import type { User } from '../../shared/types/api';
@@ -108,8 +109,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   if (isLoading) {
     return (
-      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} aria-label="Loading session">
-        <CircularProgress aria-label="Loading" />
+      <Box sx={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', bgcolor: 'background.default' }} aria-label="Loading session">
+        <Stack spacing={2} sx={{ alignItems: 'center' }}>
+          <Box component="img" src={kanbotIcon} alt="Kanbot" sx={{ width: 56, height: 56, animation: 'sparkle-pulse 1.6s ease-in-out infinite alternate', '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
+          <CircularProgress aria-label="Loading" size={24} />
+          <Typography variant="body2" color="text.secondary">Restoring your session…</Typography>
+        </Stack>
       </Box>
     );
   }

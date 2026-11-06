@@ -41,7 +41,8 @@ import {
 import DragIndicatorOutlined from '@mui/icons-material/DragIndicatorOutlined';
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { ApiError } from '../../../shared/api/errors';
-import { ErrorState } from '../../../shared/components/ui';
+import { EmptyState, ErrorState, LoadingState } from '../../../shared/components/ui';
+import { useLocale } from '../../../app/providers/use-locale';
 import { TODO_STATUSES, type Sprint, type SprintBoardResponse, type Todo, type TodoStatus } from '../../../shared/types/api';
 import { SprintSummaryPanel } from '../../ai-assistant/components/SprintSummaryPanel';
 import { listSprints, completeSprint } from '../api/sprints-api';
@@ -63,6 +64,12 @@ const typeLabels: Record<Todo['type'], string> = { task: 'Task', story: 'Story',
 const priorityLabels: Record<Todo['priority'], string> = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' };
 function dateOnly(date: Date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
+function dateLabel(date: string | null) {
+  return date
+    ? new Date(`${date}T00:00:00Z`).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    : 'Not set';
 }
 
 function remainingDays(endDate: string | null) {
@@ -96,6 +103,7 @@ function SortableTodoCard({ todo, onOpen, onStatusChange }: {
   onOpen: () => void;
   onStatusChange: (status: TodoStatus) => void;
 }) {
+  const { t } = useLocale();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: todo.id,
     data: { status: todo.status },
@@ -112,41 +120,42 @@ function SortableTodoCard({ todo, onOpen, onStatusChange }: {
     >
       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
         <Stack spacing={1}>
-          <IconButton
-            size="small"
-            aria-label={`Reorder ${todo.key}`}
-            {...attributes}
-            {...listeners}
-            onClick={(event) => event.stopPropagation()}
-            sx={{ alignSelf: 'flex-start', cursor: isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
-          >
-            <DragIndicatorOutlined fontSize="small" />
-          </IconButton>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{todo.key}</Typography>
+            <IconButton
+              size="small"
+              aria-label={`${t('Reorder')} ${todo.key}`}
+              {...attributes}
+              {...listeners}
+              onClick={(event) => event.stopPropagation()}
+              sx={{ flexShrink: 0, cursor: isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
+            >
+              <DragIndicatorOutlined fontSize="small" />
+            </IconButton>
+          </Stack>
           <Button
             onClick={onOpen}
-            sx={{ justifyContent: 'flex-start', p: 0, textAlign: 'left', textTransform: 'none', color: 'text.primary' }}
+            fullWidth
+            sx={{ minWidth: 0, justifyContent: 'flex-start', p: 0, textAlign: 'left', whiteSpace: 'normal', textTransform: 'none', color: 'text.primary' }}
           >
-            <Stack spacing={0.25}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{todo.key}</Typography>
-              <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{todo.title}</Typography>
-            </Stack>
+            <Typography sx={{ width: '100%', fontWeight: 600, lineHeight: 1.45, overflowWrap: 'anywhere' }}>{todo.title}</Typography>
           </Button>
           <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
-            <Chip size="small" variant="outlined" label={typeLabels[todo.type]} />
-            <Chip size="small" label={priorityLabels[todo.priority]} />
+            <Chip size="small" variant="outlined" label={t(typeLabels[todo.type])} />
+            <Chip size="small" label={t(priorityLabels[todo.priority])} />
             {todo.storyPoints !== null ? <Chip size="small" variant="outlined" label={`${todo.storyPoints} pts`} /> : null}
           </Stack>
           <FormControl size="small" fullWidth>
-            <InputLabel id={`status-${todo.id}`}>Status</InputLabel>
+            <InputLabel id={`status-${todo.id}`}>{t('Status')}</InputLabel>
             <Select
               labelId={`status-${todo.id}`}
-              label="Status"
+              label={t('Status')}
               value={todo.status}
               onChange={(event) => onStatusChange(event.target.value as TodoStatus)}
               onPointerDown={(event) => event.stopPropagation()}
             >
               {TODO_STATUSES.map((status) => (
-                <MenuItem key={status} value={status}>{columnLabels[status]}</MenuItem>
+                <MenuItem key={status} value={status}>{t(columnLabels[status])}</MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -167,6 +176,7 @@ function BoardColumn({
   onOpen: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
 }) {
+  const { t } = useLocale();
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status}`, data: { status } });
   return (
     <Paper
@@ -174,16 +184,21 @@ function BoardColumn({
       variant="outlined"
       sx={{
         p: 1.5,
-        minHeight: 300,
-        bgcolor: isOver ? 'action.hover' : 'background.default',
+        height: 'clamp(280px, calc(100dvh - 460px), 560px)',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        bgcolor: isOver ? 'action.hover' : 'background.subtle',
+        scrollSnapAlign: 'start',
       }}
     >
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-        <Typography component="h2" variant="h3">{columnLabels[status]}</Typography>
-        <Chip size="small" label={todos.length} aria-label={`${columnLabels[status]} count`} />
+        <Typography component="h2" variant="h3">{t(columnLabels[status])}</Typography>
+        <Chip size="small" label={todos.length} aria-label={`${t(columnLabels[status])} ${t('count')}`} />
       </Stack>
       <SortableContext items={todos.map((todo) => todo.id)} strategy={verticalListSortingStrategy}>
-        <Stack spacing={1} sx={{ minHeight: 220 }}>
+        <Stack spacing={1} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehaviorY: 'contain', pr: 0.5 }}>
           {todos.map((todo) => (
             <SortableTodoCard
               key={todo.id}
@@ -192,7 +207,7 @@ function BoardColumn({
               onStatusChange={(nextStatus) => onStatusChange(todo, nextStatus)}
             />
           ))}
-          {!todos.length ? <Typography variant="body2" color="text.secondary">No Todos</Typography> : null}
+          {!todos.length ? <Typography variant="body2" color="text.secondary">{t('No Todos')}</Typography> : null}
         </Stack>
       </SortableContext>
     </Paper>
@@ -216,6 +231,7 @@ function CompleteSprintDialog({
   onClose: () => void;
   onSubmit: (destination: string, generateSummary: boolean) => Promise<void>;
 }) {
+  const { t } = useLocale();
   const [destination, setDestination] = useState('backlog');
   const [generateSummary, setGenerateSummary] = useState(false);
   const [fieldError, setFieldError] = useState('');
@@ -226,7 +242,7 @@ function CompleteSprintDialog({
     event.preventDefault();
     if (pending) return;
     if (destination !== 'backlog' && !plannedSprints.some((sprintOption) => sprintOption.id === destination)) {
-      setFieldError('Choose the backlog or a planned Sprint.');
+      setFieldError(t('Choose the backlog or a planned Sprint.'));
       return;
     }
     setFieldError('');
@@ -235,23 +251,23 @@ function CompleteSprintDialog({
 
   return (
     <Dialog open onClose={pending ? undefined : onClose} fullWidth maxWidth="sm" aria-labelledby="complete-sprint-title">
-      <DialogTitle id="complete-sprint-title">Complete {sprint.name}?</DialogTitle>
+      <DialogTitle id="complete-sprint-title">{t('Complete')} {sprint.name}?</DialogTitle>
       <form onSubmit={submit} noValidate aria-busy={pending}>
         <DialogContent dividers>
           <Stack spacing={2}>
             {error ? <Alert severity="error" role="alert">{error}</Alert> : null}
             <Typography>
-              {completed} completed Todo{completed === 1 ? '' : 's'} · {unfinished} unfinished Todo{unfinished === 1 ? '' : 's'}
+              {completed} {t('completed')} {t('Todos')} · {unfinished} {t('unfinished')} {t('Todos')}
             </Typography>
             <FormControl fullWidth error={Boolean(fieldError)}>
-              <InputLabel id="unfinished-destination-label">Move unfinished Todos to</InputLabel>
+              <InputLabel id="unfinished-destination-label">{t('Move unfinished Todos to')}</InputLabel>
               <Select
                 labelId="unfinished-destination-label"
-                label="Move unfinished Todos to"
+                label={t('Move unfinished Todos to')}
                 value={destination}
                 onChange={(event) => setDestination(event.target.value)}
               >
-                <MenuItem value="backlog">Backlog</MenuItem>
+                <MenuItem value="backlog">{t('Backlog')}</MenuItem>
                 {plannedSprints.map((planned) => (
                   <MenuItem key={planned.id} value={planned.id}>{planned.name}</MenuItem>
                 ))}
@@ -260,15 +276,15 @@ function CompleteSprintDialog({
             </FormControl>
             <FormControlLabel
               control={<Checkbox checked={generateSummary} onChange={(event) => setGenerateSummary(event.target.checked)} />}
-              label="Generate AI summary"
+              label={t('Generate AI summary')}
             />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} disabled={pending}>Cancel</Button>
+          <Button onClick={onClose} disabled={pending}>{t('Cancel')}</Button>
           <Button type="submit" color="primary" variant="contained" disabled={pending}>
             {pending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-            Complete Sprint
+            {t('Complete Sprint')}
           </Button>
         </DialogActions>
       </form>
@@ -278,6 +294,7 @@ function CompleteSprintDialog({
 
 export function BoardPage() {
   const { projectId = '' } = useParams();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { notify } = useFeedback();
@@ -409,20 +426,22 @@ export function BoardPage() {
     moveMutation.mutate({ todoId: todo.id, status, position: board.columns[status].length });
   }
 
-  if (sprintsQuery.isLoading) return <CircularProgress aria-label="Loading active Sprint" />;
+  if (sprintsQuery.isLoading) return <LoadingState label="Loading active Sprint" rows={2} />;
   if (sprintsQuery.isError) {
     return <ErrorState message={sprintsQuery.error instanceof Error ? sprintsQuery.error.message : 'Unable to load Sprints.'} onRetry={() => void sprintsQuery.refetch()} />;
   }
   if (!activeSprint) {
     return (
-      <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-        <Typography component="h1" variant="h2" gutterBottom>No active Sprint</Typography>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>Start a planned Sprint from your backlog to see its board here.</Typography>
-        <Button component={Link} to={`/projects/${projectId}/backlog`} variant="contained">Go to Backlog</Button>
+      <Paper variant="outlined">
+        <EmptyState
+          title="No active Sprint"
+          description="Start a planned Sprint from your backlog to see its board here."
+          action={<Button component={Link} to={`/projects/${projectId}/backlog`} variant="contained">{t('Go to Backlog')}</Button>}
+        />
       </Paper>
     );
   }
-  if (boardQuery.isLoading) return <CircularProgress aria-label="Loading Sprint board" />;
+  if (boardQuery.isLoading) return <LoadingState label="Loading Sprint board" rows={4} />;
   if (boardQuery.isError || !board) {
     return <ErrorState message={boardQuery.error instanceof Error ? boardQuery.error.message : 'Unable to load the Sprint board.'} onRetry={() => void boardQuery.refetch()} />;
   }
@@ -432,6 +451,11 @@ export function BoardPage() {
   const days = remainingDays(sprint.endDate);
   const completionPercent = stats.totalTodos ? Math.round((stats.doneTodos / stats.totalTodos) * 100) : 0;
   const pointsPercent = stats.totalPoints ? Math.round((stats.donePoints / stats.totalPoints) * 100) : 0;
+  const remainingLabel = days === null
+    ? `${t('Remaining days')}: ${t('Not set')}`
+    : days < 0
+      ? `${Math.abs(days)} ${t('days overdue')}`
+      : `${days} ${t('days remaining')}`;
 
   return (
     <Stack spacing={2}>
@@ -448,31 +472,42 @@ export function BoardPage() {
             setCompleteOpen(true);
           }}
         >
-          Complete Sprint
+          {t('Complete Sprint')}
         </Button>
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1.5}>
           <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
-            <Typography>Start: {sprint.startDate ?? 'Not set'}</Typography>
-            <Typography>End: {sprint.endDate ?? 'Not set'}</Typography>
-            <Typography>{days === null ? 'Remaining days: Not set' : days < 0 ? `${Math.abs(days)} days overdue` : `${days} days remaining`}</Typography>
+            <Typography>{t('Start')}: {dateLabel(sprint.startDate)}</Typography>
+            <Typography>{t('End')}: {dateLabel(sprint.endDate)}</Typography>
+            <Typography>{remainingLabel}</Typography>
           </Stack>
           <Stack spacing={0.5}>
             <Typography variant="body2">{stats.doneTodos} / {stats.totalTodos} Todos completed ({completionPercent}%)</Typography>
-            <LinearProgress variant="determinate" value={completionPercent} aria-label="Todo completion" />
+            <LinearProgress variant="determinate" value={completionPercent} aria-label={t('Todo completion')} />
           </Stack>
           <Stack spacing={0.5}>
             <Typography variant="body2">{stats.donePoints} / {stats.totalPoints} story points completed ({pointsPercent}%)</Typography>
-            <LinearProgress variant="determinate" value={pointsPercent} aria-label="Story point completion" />
+            <LinearProgress variant="determinate" value={pointsPercent} aria-label={t('Story point completion')} />
           </Stack>
         </Stack>
       </Paper>
 
       <SprintSummaryPanel sprint={sprint} projectId={projectId} />
 
-      {moveMutation.error ? <Alert severity="error">{moveMutation.error instanceof ApiError ? moveMutation.error.message : 'Todo move failed.'}</Alert> : null}
+      {moveMutation.error ? (
+        <Alert
+          severity="error"
+          action={moveMutation.variables ? (
+            <Button color="inherit" size="small" onClick={() => moveMutation.mutate(moveMutation.variables)} disabled={moveMutation.isPending}>
+              {t('Retry')}
+            </Button>
+          ) : undefined}
+        >
+          {moveMutation.error instanceof ApiError ? moveMutation.error.message : t('Todo move failed.')}
+        </Alert>
+      ) : null}
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -491,7 +526,21 @@ export function BoardPage() {
         }}
         onDragCancel={() => setDragAnnouncement('Drag cancelled')}
       >
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(4, minmax(0, 1fr))' }, gap: 1.5, alignItems: 'start' }}>
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'repeat(4, minmax(min(86vw, 320px), 1fr))',
+            md: 'repeat(4, minmax(280px, 1fr))',
+            xl: 'repeat(4, minmax(0, 1fr))',
+          },
+          gap: 1.5,
+          alignItems: 'start',
+          minWidth: 0,
+          overflowX: 'auto',
+          overscrollBehaviorX: 'contain',
+          scrollSnapType: { xs: 'x mandatory', md: 'x proximity' },
+          pb: 1,
+        }}>
           {TODO_STATUSES.map((status) => (
             <BoardColumn
               key={status}
