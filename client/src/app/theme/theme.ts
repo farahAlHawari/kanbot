@@ -93,6 +93,7 @@ export const theme = createTheme({
           outlineOffset: 2,
           boxShadow: '0 0 0 2px var(--mui-palette-background-paper), 0 0 0 4px var(--mui-palette-primary-light)',
         },
+        '.MuiInputBase-input:focus-visible': { outline: 'none', boxShadow: 'none' },
         '::selection': { backgroundColor: 'var(--mui-palette-brand-200)' },
         'code, .tabular-nums': { fontVariantNumeric: 'tabular-nums' },
         'code, kbd, pre': { fontFamily: '"JetBrains Mono Variable", ui-monospace, monospace' },
@@ -171,12 +172,30 @@ export const theme = createTheme({
         },
       },
     },
-    MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' }, rounded: { borderRadius: 12 } } },
+    MuiPaper: {
+      styleOverrides: {
+        root: { backgroundImage: 'none' },
+        // outlined variant: crisp 10px radius + very subtle shadow so it lifts off the page
+        outlined: {
+          borderRadius: 10,
+          boxShadow: '0 1px 3px rgb(15 27 34 / .04)',
+          borderColor: 'var(--mui-palette-divider)',
+          '[data-dark] &': { boxShadow: 'none' },
+        },
+        // default (elevation) variant keeps a slightly larger radius
+        rounded: { borderRadius: 12 },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 10,
           borderColor: 'var(--mui-palette-divider)',
+          // Cards that are outlined get a hair of shadow so they read as surfaces
+          '&.MuiPaper-outlined': {
+            boxShadow: '0 1px 3px rgb(15 27 34 / .04)',
+            '[data-dark] &': { boxShadow: 'none' },
+          },
         },
       },
     },
@@ -222,6 +241,21 @@ export const theme = createTheme({
             borderRadius: '16px 16px 0 0',
             paddingBottom: 'env(safe-area-inset-bottom)',
           },
+        },
+      },
+    },
+    MuiCardContent: {
+      styleOverrides: {
+        root: {
+          padding: 16,
+          '&:last-child': { paddingBottom: 16 },
+        },
+      },
+    },
+    MuiCardActions: {
+      styleOverrides: {
+        root: {
+          padding: '8px 16px 14px',
         },
       },
     },

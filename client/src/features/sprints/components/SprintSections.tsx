@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useDroppable } from '@dnd-kit/core';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Accordion,
   AccordionDetails,
@@ -35,14 +36,10 @@ import { TodoDetailsDialog } from '../../todos/components/TodoDetailsDialog';
 import { todosQueryKey } from '../../todos/hooks/use-backlog';
 import { sprintsQueryKey, useSprints } from '../hooks/use-sprints';
 import { EmptyState, ErrorState, LoadingState } from '../../../shared/components/ui';
+import { PriorityBadge, TaskTypeBadge, TodoStatusBadge } from '../../../shared/components/ui';
+import { todoTypeAccentSx } from '../../../shared/components/todo-visuals';
 import { useLocale } from '../../../app/providers/use-locale';
-
-function localDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+import { localDate } from '../../../shared/utils/dates';
 
 function dateLabel(date: string | null): string {
   if (!date) return 'Not set';
@@ -265,11 +262,40 @@ function SprintTodoRow({
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const { t } = useLocale();
   return (
-    <Paper variant="outlined" sx={{ p: 1.25, display: 'flex', alignItems: 'center', gap: 1 }}>
-      <Button onClick={onOpen} sx={{ flex: 1, justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none' }}>
-        <Stack>
-          <Typography variant="caption" color="text.secondary">{todo.key}</Typography>
-          <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{todo.title}</Typography>
+    <Paper
+      variant="outlined"
+      sx={{
+        px: 1.5,
+        py: 1.25,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        '&:hover': { borderColor: 'primary.light' },
+        ...todoTypeAccentSx(todo.type),
+      }}
+    >
+      <Button
+        onClick={onOpen}
+        sx={{ flex: 1, minWidth: 0, justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none', whiteSpace: 'normal', '&:hover': { bgcolor: 'transparent' } }}
+      >
+        <Stack sx={{ minWidth: 0, alignItems: 'flex-start', width: '100%' }}>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'baseline', flexWrap: 'wrap', mb: 0.25 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 700, fontFamily: '"JetBrains Mono Variable", ui-monospace, monospace', letterSpacing: '0.02em', flexShrink: 0 }}
+            >
+              {todo.key}
+            </Typography>
+            <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', overflowWrap: 'anywhere', textAlign: 'left', lineHeight: 1.45 }}>
+              {todo.title}
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', mt: 0.5 }}>
+            <TaskTypeBadge type={todo.type} />
+            <TodoStatusBadge status={todo.status} />
+            <PriorityBadge priority={todo.priority} />
+          </Stack>
         </Stack>
       </Button>
       <IconButton
@@ -305,6 +331,11 @@ function SprintSection({
 }) {
   const { t } = useLocale();
   const [expanded, setExpanded] = useState(sprint.status === 'active');
+  const { setNodeRef, isOver } = useDroppable({
+    id: `sprint-${sprint.id}`,
+    data: { sprintId: sprint.id },
+    disabled: sprint.status === 'completed',
+  });
   const todosQuery = useQuery({
     queryKey: [...todosQueryKey(sprint.projectId), sprint.id],
     queryFn: () => listTodos(sprint.projectId, { sprintId: sprint.id }),
@@ -312,21 +343,26 @@ function SprintSection({
   });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const navigate = useNavigate();
   const pendingAction = sprint.status === 'planned';
 
   return (
     <>
       <Accordion
+        ref={setNodeRef}
         disableGutters
         variant="outlined"
         expanded={expanded}
         onChange={(_event, isExpanded) => setExpanded(isExpanded)}
+        sx={{
+          borderColor: isOver ? 'primary.main' : undefined,
+          bgcolor: isOver ? 'action.hover' : undefined,
+          transition: 'border-color 120ms ease, background-color 120ms ease',
+        }}
       >
         <AccordionSummary expandIcon={<ExpandMoreOutlined />} aria-controls={`sprint-${sprint.id}-content`}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.5, sm: 2 }} sx={{ width: '100%', alignItems: { sm: 'center' }, pr: 1 }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
-              <Typography sx={{ fontWeight: 700 }}>{sprint.name}</Typography>
+              <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere', minWidth: 0 }}>{sprint.name}</Typography>
               <Chip
                 size="small"
                 color={sprint.status === 'active' ? 'success' : sprint.status === 'completed' ? 'default' : 'primary'}
@@ -343,7 +379,7 @@ function SprintSection({
         </AccordionSummary>
         <AccordionDetails id={`sprint-${sprint.id}-content`}>
           <Stack spacing={1.5}>
-            {sprint.goal ? <Typography color="text.secondary">{sprint.goal}</Typography> : <Typography color="text.secondary">{t('No goal set.')}</Typography>}
+            {sprint.goal ? <Typography color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>{sprint.goal}</Typography> : <Typography color="text.secondary">{t('No goal set.')}</Typography>}
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
               {pendingAction ? (
                 <>
@@ -360,8 +396,12 @@ function SprintSection({
                     </Typography>
                   ) : null}
                 </>
+              ) : sprint.status === 'completed' ? (
+                <Button size="small" component={Link} to={`/projects/${sprint.projectId}/sprints/${sprint.id}`}>
+                  {t('View details')}
+                </Button>
               ) : (
-                <Button size="small" onClick={() => navigate(`/projects/${sprint.projectId}/board`)}>
+                <Button size="small" component={Link} to={`/projects/${sprint.projectId}/board`}>
                   {t('Open board')}
                 </Button>
               )}
@@ -381,7 +421,9 @@ function SprintSection({
               </Stack>
             ) : null}
             {sprint.status !== 'completed' && !todosQuery.isLoading && !todosQuery.isError && !todosQuery.data?.todos.length ? (
-              <EmptyState title="No Todos assigned to this Sprint." />
+              <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', textAlign: 'center' }}>
+                <EmptyState title="No Todos assigned to this Sprint." />
+              </Box>
             ) : null}
           </Stack>
         </AccordionDetails>
@@ -462,7 +504,14 @@ export function SprintSections({
   const [formSprint, setFormSprint] = useState<Sprint | null | undefined>(undefined);
   const [startSprintTarget, setStartSprintTarget] = useState<Sprint | null>(null);
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
-  const sprints = data?.sprints ?? [];
+  const sprintStatusOrder: Record<Sprint['status'], number> = {
+    planned: 0,
+    active: 1,
+    completed: 2,
+  };
+  const sprints = [...(data?.sprints ?? [])].sort(
+    (first, second) => sprintStatusOrder[first.status] - sprintStatusOrder[second.status],
+  );
   const hasActiveSprint = sprints.some((sprint) => sprint.status === 'active');
   const plannedSprints = sprints.filter((sprint) => sprint.status === 'planned');
   const nextNumber = sprints.reduce((max, sprint) => {
@@ -583,11 +632,12 @@ export function SprintSections({
             ))}
           </Stack>
         ) : (
-          <EmptyState
-            title="No Sprints yet"
-            description="Create a Sprint to start planning."
-            action={<Button variant="contained" startIcon={<AddOutlined />} onClick={() => { createMutation.reset(); setFormSprint(null); }}>{t('Create Sprint')}</Button>}
-          />
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+            <EmptyState
+              title="No Sprints yet"
+              description="Create a Sprint to start planning."
+            />
+          </Box>
         )}
 
         {formSprint !== undefined ? (

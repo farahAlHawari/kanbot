@@ -50,11 +50,8 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
       setReasoning(plan.reasoning);
       setSuggestedIds(availableIds);
       setSelectedIds(availableIds);
-      setError('');
+      setError(availableIds.length ? '' : t('The suggested plan did not include any Todos from the current backlog. Please try again.'));
     },
-    onError: (failure: unknown) => setError(failure instanceof ApiError && failure.status === 429
-      ? 'Too many requests. Please wait a moment.'
-      : failure instanceof Error ? failure.message : t('Unable to suggest a Sprint plan.')),
   });
 
   const createMutation = useMutation({
@@ -70,20 +67,25 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
     onError: (failure: unknown) => setError(failure instanceof Error ? failure.message : t('Unable to create the Sprint.')),
   });
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function requestPlan() {
     if (planMutation.isPending || !Number.isInteger(capacity) || capacity < 1 || capacity > 200) return;
     setError('');
+    planMutation.reset();
+    createMutation.reset();
     planMutation.mutate();
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    requestPlan();
   }
 
   const canCreate = suggestedIds.length > 0 && selectedIds.length > 0 && selectedPoints <= capacity && goal.trim().length > 0 && !createMutation.isPending;
 
   return (
-    <Dialog open onClose={planMutation.isPending || createMutation.isPending ? undefined : onClose} fullWidth maxWidth="md">
-      <DialogTitle>{t('Plan a Sprint with AI')}</DialogTitle>
-      <form onSubmit={submit}>
-        <DialogContent dividers>
+    <Dialog open onClose={planMutation.isPending || createMutation.isPending ? undefined : onClose} fullWidth maxWidth="md" aria-labelledby="plan-sprint-dialog-title">
+      <DialogTitle id="plan-sprint-dialog-title">{t('Plan a Sprint with AI')}</DialogTitle>
+      <DialogContent dividers>
           <Stack spacing={2}>
             {error ? <Alert severity="error">{error}</Alert> : null}
             {backlogQuery.isLoading ? (
@@ -94,11 +96,16 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
                 {t('Unable to load backlog Todos for planning.')}
               </Alert>
             ) : null}
+            {!backlogQuery.isLoading && !backlogQuery.isError && backlog.length === 0 ? (
+              <Alert severity="info">{t('Your backlog is empty. Add Todos first.')}</Alert>
+            ) : null}
+            <form onSubmit={submit}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
               <TextField
                 label={t('Capacity (story points)')}
                 type="number"
                 required
+                autoFocus
                 value={capacity}
                 onChange={(event) => setCapacity(Number(event.target.value))}
                 slotProps={{ htmlInput: { min: 1, max: 200 } }}
@@ -107,12 +114,23 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
               />
               <TextField label={t('Focus or objective (optional)')} fullWidth value={focus} onChange={(event) => setFocus(event.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} />
             </Stack>
-            <Button type="submit" variant="outlined" disabled={planMutation.isPending || backlogQuery.isLoading || !Number.isInteger(capacity) || capacity < 1 || capacity > 200}>
+            <Button type="submit" variant="outlined" disabled={planMutation.isPending || backlogQuery.isLoading || backlog.length === 0 || !Number.isInteger(capacity) || capacity < 1 || capacity > 200}>
               {planMutation.isPending ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}
               {t('Suggest plan')}
             </Button>
-            {planMutation.error instanceof ApiError && (planMutation.error.status === 429 || planMutation.error.status === 502) ? (
-              <Button onClick={() => planMutation.mutate()} disabled={planMutation.isPending}>{t('Retry')}</Button>
+            </form>
+            {planMutation.isError ? (
+              <Alert severity="error" role="alert" action={
+                <Button color="inherit" size="small" onClick={requestPlan} disabled={planMutation.isPending}>
+                  {t('Retry')}
+                </Button>
+              }>
+                {planMutation.error instanceof ApiError && planMutation.error.status === 429
+                  ? t('Too many requests. Please wait a moment.')
+                  : planMutation.error instanceof Error
+                    ? planMutation.error.message
+                    : t('Unable to suggest a Sprint plan.')}
+              </Alert>
             ) : null}
             {suggestedIds.length > 0 ? (
               <>
@@ -148,7 +166,6 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
             </Button>
           ) : null}
         </DialogActions>
-      </form>
     </Dialog>
   );
 }

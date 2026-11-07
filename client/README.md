@@ -84,11 +84,11 @@ To enable a provider, configure the Backend's private environment (for example `
 
 ## UI and design
 
-The presentation follows the supplied Kanbot design brief while retaining React, MUI, and the existing application behavior. A single CSS-variable-enabled MUI theme defines light and dark Lagoon teal/amber schemes, cool neutral surfaces, semantic tints, typography, focus treatment, and component defaults. Inter and JetBrains Mono are self-hosted through `@fontsource-variable`; spacing, radii, motion, and other non-colour aliases are in `src/app/theme/tokens.css`.
+The presentation follows the supplied Kanbot design brief while retaining React, MUI, and the existing application behavior. A single CSS-variable-enabled MUI theme defines light and dark Lagoon teal/amber schemes, cool neutral surfaces, semantic tints, typography, focus treatment, and component defaults. Task, Story, and Bug use distinct blue, purple, and red type accents; shared badges show type, status, and priority with text and icons as well as color. Inter and JetBrains Mono are self-hosted through `@fontsource-variable`; spacing, radii, motion, and other non-colour aliases are in `src/app/theme/tokens.css`.
 
 The new light/dark wordmarks, tagline artwork, and mascot live under `src/assets/brand/`; the favicon and touch icon are in `public/`. Existing artwork was preserved. Authentication uses a responsive split hero/form card, and the app shell adapts from phone bottom navigation to a tablet icon rail and desktop sidebar. The Sprint board uses horizontal scroll and snap behavior on narrow screens. AI actions share a restrained teal treatment, assistant Markdown keeps raw HTML disabled, and the drawer displays the review disclaimer. Visible keyboard focus, reduced-motion handling, semantic labels, and coarse-pointer target sizing are included.
 
-The interface is English-only. Backlog and Sprint planning sit side by side on wide screens, and shared loading, empty, and retryable error states are used across the data pages.
+The interface is English-only. Planned Sprint sections precede the Backlog as specified in the product requirements and wireframes. Shared loading, empty, and retryable error states are used across the data pages.
 
 The interface retains the real Backend integrations, TanStack Query synchronization, and accessible non-drag alternatives where implemented. Visual and responsive refinements do not imply that every requirement has passed end-to-end testing; see the [requirement traceability report](./REQUIREMENT-TRACEABILITY.md) for verified and unverified scenarios.
 

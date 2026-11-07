@@ -77,12 +77,28 @@ a {
   display: block;
 }
 
+.sidebar-icon {
+  display: block;
+}
+
 .sidebar-logo.brand-logo-light,
 .sidebar-logo.brand-logo-dark {
   display: none;
 }
 
-@media (min-width: 1024px) {
+.sidebar-brand .sidebar-logo {
+  flex-shrink: 0;
+}
+
+@container sidebar (min-width: 180px) {
+  .sidebar-brand {
+    justify-content: flex-start;
+  }
+
+  .sidebar-brand .sidebar-icon {
+    display: none;
+  }
+
   .sidebar-logo.brand-logo-light {
     display: block;
   }

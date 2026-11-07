@@ -1,6 +1,7 @@
 import { Box, Button, Card, CardActionArea, CardContent, Chip, Stack, Typography } from '@mui/material';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Sprint, SprintStatus } from '../../../shared/types/api';
+import { ApiError } from '../../../shared/api/errors';
 import { EmptyState, ErrorState, LoadingState } from '../../../shared/components/ui';
 import { useLocale } from '../../../app/providers/use-locale';
 import { useSprints } from '../hooks/use-sprints';
@@ -29,7 +30,17 @@ export function SprintHistoryPage() {
   const { data, isLoading, isError, error, refetch } = useSprints(projectId);
 
   if (isLoading) return <LoadingState label="Loading Sprint history" rows={3} />;
-  if (isError) return <ErrorState message={error instanceof Error ? error.message : 'Unable to load Sprint history.'} onRetry={() => void refetch()} />;
+  if (isError) {
+    const unavailable = error instanceof ApiError && (error.status === 403 || error.status === 404);
+    return (
+      <ErrorState
+        message={error instanceof Error ? error.message : 'Unable to load Sprint history.'}
+        {...(unavailable
+          ? { action: <Button component={Link} to="/projects">{t('Go to projects')}</Button> }
+          : { onRetry: () => void refetch() })}
+      />
+    );
+  }
 
   const sprints = data?.sprints ?? [];
   return (
@@ -56,20 +67,28 @@ export function SprintHistoryPage() {
               <Chip size="small" label={items.length} />
             </Stack>
             {items.map((sprint) => (
-              <Card key={sprint.id} variant="outlined">
-                <CardActionArea component={Link} to={`/projects/${projectId}/sprints/${sprint.id}`}>
+              <Card key={sprint.id} variant="outlined" sx={{ '&:hover': { borderColor: 'primary.light', boxShadow: 'var(--shadow-sm)' } }}>
+                <CardActionArea component={Link} to={`/projects/${projectId}/sprints/${sprint.id}`} sx={{ p: 0 }}>
                   <CardContent>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Typography sx={{ fontWeight: 700 }}>{sprint.name}</Typography>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{sprint.name}</Typography>
                         <Chip size="small" color={status === 'active' ? 'success' : status === 'planned' ? 'primary' : 'default'} label={t(status)} />
                       </Stack>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
                         {dateLabel(sprint.startDate)} – {dateLabel(sprint.endDate)}
                       </Typography>
                     </Stack>
-                    <Typography variant="body2" sx={{ mt: 1 }}>{sprintPoints(sprint, t)}</Typography>
-                    {sprint.goal ? <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{sprint.goal}</Typography> : null}
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>{sprintPoints(sprint, t)}</Typography>
+                    {sprint.goal ? (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 0.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere' }}
+                      >
+                        {sprint.goal}
+                      </Typography>
+                    ) : null}
                   </CardContent>
                 </CardActionArea>
               </Card>

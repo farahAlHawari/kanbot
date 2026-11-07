@@ -22,8 +22,7 @@ import { ApiError } from '../../../shared/api/errors';
 import type { ChatMessage, SprintSummary } from '../../../shared/types/api';
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { sprintsQueryKey, useSprints } from '../../sprints/hooks/use-sprints';
-import { summarizeSprint } from '../api/ai-api';
-import { chat, getAiStatus } from '../api/ai-api';
+import { chat, getAiStatus, summarizeSprint } from '../api/ai-api';
 import { AiSprintPlanningDialog } from './AiSprintPlanningDialog';
 import { GenerateTodosDialog } from '../../todos/components/GenerateTodosDialog';
 import kanbotIcon from '../../../assets/brand/kanbot-icon.svg';
@@ -68,10 +67,15 @@ export function AssistantDrawer({
   }, [messages, open]);
 
   const chatMutation = useMutation({
-    mutationFn: ({ targetProjectId, conversation }: { targetProjectId: string; conversation: ChatMessage[] }) =>
+    mutationFn: ({ targetProjectId, conversation }: { targetProjectId: string; conversation: ChatMessage[]; content: string }) =>
       chat(targetProjectId, { messages: conversation }),
     onSuccess: ({ message }, variables) => {
       if (variables.targetProjectId === projectId) setMessages((current) => [...current, message]);
+    },
+    onError: (_failure, variables) => {
+      if (variables.targetProjectId === projectId) {
+        setInput((current) => current || variables.content);
+      }
     },
   });
 
@@ -96,14 +100,21 @@ export function AssistantDrawer({
     const content = input.trim();
     if (!projectId || !content || chatMutation.isPending || content.length > 4000) return;
     const userMessage: ChatMessage = { role: 'user', content };
-    const conversation: ChatMessage[] = [...messages, userMessage].slice(-30);
-    setMessages(conversation);
+    const fullConversation = [...messages, userMessage];
+    const conversation = fullConversation.slice(-30);
+    setMessages(fullConversation);
     setInput('');
-    chatMutation.mutate({ targetProjectId: projectId, conversation });
+    chatMutation.mutate({ targetProjectId: projectId, conversation, content });
   }
 
   function onInputKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (
+      event.key === 'Enter'
+      && !event.shiftKey
+      && !event.nativeEvent.isComposing
+      && typeof window !== 'undefined'
+      && window.matchMedia('(pointer: fine)').matches
+    ) {
       event.preventDefault();
       event.currentTarget.closest('form')?.requestSubmit();
     }
@@ -141,9 +152,19 @@ export function AssistantDrawer({
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ p: 1.5, borderBottom: 1, borderColor: 'divider', flexWrap: 'nowrap', overflowX: 'auto' }}>
-            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!projectId} onClick={() => setGenerateOpen(true)}>{t('Create todos')}</Button>
-            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!projectId} onClick={() => setPlanOpen(true)}>{t('Plan sprint')}</Button>
-            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!summarySprint || summaryMutation.isPending} onClick={() => summarySprint && projectId && summaryMutation.mutate({ targetProjectId: projectId, sprintId: summarySprint.id })}>
+            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!projectId || chatMutation.isPending || summaryMutation.isPending} onClick={() => setGenerateOpen(true)}>
+              {t('Create todos')}
+            </Button>
+            <Button size="small" variant="ai" startIcon={<AutoAwesomeOutlined />} disabled={!projectId || chatMutation.isPending || summaryMutation.isPending} onClick={() => setPlanOpen(true)}>
+              {t('Plan sprint')}
+            </Button>
+            <Button
+              size="small"
+              variant="ai"
+              startIcon={summaryMutation.isPending ? <CircularProgress size={16} /> : <AutoAwesomeOutlined />}
+              disabled={!summarySprint || summaryMutation.isPending || chatMutation.isPending}
+              onClick={() => summarySprint && projectId && summaryMutation.mutate({ targetProjectId: projectId, sprintId: summarySprint.id })}
+            >
               {t('Summarize sprint')}
             </Button>
           </Stack>
@@ -237,7 +258,6 @@ export function AssistantDrawer({
           </Box>
         </Stack>
       </Drawer>
-
       {projectId && generateOpen ? <GenerateTodosDialog projectId={projectId} onClose={() => setGenerateOpen(false)} /> : null}
       {projectId && planOpen ? <AiSprintPlanningDialog projectId={projectId} onClose={() => setPlanOpen(false)} /> : null}
     </>

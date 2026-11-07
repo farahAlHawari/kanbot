@@ -35,7 +35,7 @@ import kanbotLogo from '../../assets/brand/kanbot-logo.svg';
 import kanbotLogoDark from '../../assets/brand/kanbot-logo-dark.svg';
 import kanbotIcon from '../../assets/brand/kanbot-icon.svg';
 import { useAuth } from '../../features/auth';
-import { useProjects } from '../../features/projects';
+import { useProjects } from '../../features/projects/hooks/use-projects';
 import { AssistantDrawer } from '../../features/ai-assistant/components/AssistantDrawer';
 import { useLocale } from '../providers/use-locale';
 
@@ -246,10 +246,12 @@ export function AppShell() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const { t } = useLocale();
   const { user, logout } = useAuth();
+  const { mode, systemMode } = useColorScheme();
   const location = useLocation();
   const navigate = useNavigate();
   const { projectId } = useParams();
   const title = getPageTitle(location.pathname, t);
+  const darkMode = mode === 'dark' || (mode === 'system' && systemMode === 'dark');
   const projectsQuery = useProjects();
   const project = projectsQuery.data?.projects.find((item) => item.id === projectId);
 
@@ -274,10 +276,37 @@ export function AppShell() {
         overflow: 'hidden',
       }}
     >
-      <Box component={RouterLink} to="/projects" aria-label="Kanbot home" sx={{ display: 'flex', justifyContent: { md: 'center', lg: 'flex-start' }, mb: 2, lineHeight: 0, flexShrink: 0 }}>
-        <Box component="img" src={kanbotIcon} alt="Kanbot" sx={{ display: { md: 'block', lg: 'none' }, width: 40, height: 40 }} />
-        <Box component="img" className="sidebar-logo brand-logo-light" src={kanbotLogo} alt="Kanbot" sx={{ width: 168, height: 'auto' }} />
-        <Box component="img" className="sidebar-logo brand-logo-dark" src={kanbotLogoDark} alt="Kanbot" sx={{ width: 168, height: 'auto' }} />
+      {/* Logo: icon-only at md (64px rail), full wordmark logo at lg+ (248px sidebar) */}
+      <Box
+        component={RouterLink}
+        to="/projects"
+        aria-label="Kanbot home"
+        sx={{
+          display: 'flex',
+          justifyContent: { md: 'center', lg: 'flex-start' },
+          alignItems: 'center',
+          width: '100%',
+          minWidth: 0,
+          mb: 2,
+          lineHeight: 0,
+          flexShrink: 0,
+          overflow: 'hidden',
+          textDecoration: 'none',
+        }}
+      >
+        {/* Icon — only at md */}
+        <Box
+          component="img"
+          src={kanbotIcon}
+          alt="Kanbot"
+          sx={{ display: { md: 'block', lg: 'none' }, width: 36, height: 36, flexShrink: 0 }}
+        />
+        <Box
+          component="img"
+          src={darkMode ? kanbotLogoDark : kanbotLogo}
+          alt="Kanbot"
+          sx={{ display: { md: 'none', lg: 'block' }, width: 148, height: 'auto', flexShrink: 0 }}
+        />
       </Box>
       <Box component="nav" aria-label={t('Workspace')} sx={{ minHeight: 0, flex: 1, overflowY: 'auto', overscrollBehaviorY: 'contain' }}>
         <Typography variant="overline" color="text.secondary" sx={{ display: { md: 'none', lg: 'block' } }}>{t('Workspace')}</Typography>
@@ -360,14 +389,11 @@ export function AppShell() {
                 <Button onClick={logout} color="inherit">{t('Log out')}</Button>
               </Box>
             </Box>
-            {projectId ? (
-              <Box sx={{ display: { xs: 'none', md: 'flex' }, width: '100%', gap: 0.5 }}>
-                <Box sx={{ display: { md: 'flex', lg: 'none' }, width: '100%' }}><ProjectNav projectId={projectId} /></Box>
-              </Box>
-            ) : null}
           </Toolbar>
         </AppBar>
-        <Box component="main" id="main-content" sx={{ p: { xs: 2, md: 3, lg: 4 }, pb: { xs: 11, md: 3, lg: 4 }, flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehaviorY: 'contain' }}>
+        {/* pb on xs must clear the fixed bottom nav (56 px) + safe-area-inset-bottom + breathing room.
+            We use a CSS calc() so it adapts to notch height on every device. */}
+        <Box component="main" id="main-content" sx={{ p: { xs: 2, md: 3, lg: 4 }, pb: { xs: 'calc(56px + env(safe-area-inset-bottom, 0px) + 16px)', md: 3, lg: 4 }, flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehaviorY: 'contain' }}>
           {projectsQuery.isError && !location.pathname.startsWith('/projects') ? (
             <Alert severity="warning" sx={{ mb: 2 }}>{t('Project navigation could not be loaded. Please try again.')}</Alert>
           ) : null}

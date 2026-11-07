@@ -34,6 +34,18 @@ npm run dev            # → http://localhost:4000/api/health
 
 Then follow the [implementation plan](docs/IMPLEMENTATION-PLAN.en.md#5-day-by-day-plan) day by day.
 
+## Groq AI (optional)
+
+The backend defaults to the built-in mock assistant. To use Groq, create a key in [Groq Console](https://console.groq.com/keys), then edit the ignored `server/.env` file locally:
+
+```env
+AI_API_KEY=<your-groq-api-key>
+AI_BASE_URL=https://api.groq.com/openai/v1
+AI_MODEL=<active-model-id-from-groq-model-catalog>
+```
+
+Select an active model ID from [Groq's model catalog](https://console.groq.com/docs/models); model availability changes. Restart the server and verify `GET http://localhost:4000/api/ai/status` reports `mode: "ai"`. Keep the key server-side only—never put it in `client/.env`, frontend code, browser storage, logs, or commits. See [`server/README.md`](server/README.md#groq-ai-configuration) for details.
+
 ## Design
 
 - `design/wireframes/*.png`: 12 greyscale wireframes (flow + 11 screens). They show **content and layout only**. Colours, typography and components are up to you.

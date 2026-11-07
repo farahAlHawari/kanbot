@@ -152,7 +152,9 @@ await step('board: columns, drag between columns, patch status', async () => {
 });
 
 await step('ai: status, generate todos, plan sprint, chat (mock)', async () => {
-  assert.equal((await call('GET', '/ai/status')).json.mode, 'mock');
+  const aiStatus = await call('GET', '/ai/status');
+  assert.equal(aiStatus.json.mode, 'mock');
+  assert.equal(aiStatus.json.model, null);
   const gen = await call('POST', `/projects/${projectId}/ai/generate-todos`, { prompt: 'User profile page', count: 4 });
   assert.equal(gen.status, 200);
   assert.equal(gen.json.todos.length, 4);

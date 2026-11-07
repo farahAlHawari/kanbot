@@ -19,6 +19,7 @@ import {
   type TodoPriority,
 } from '../types/api.js';
 import { complete, extractJson } from './client.js';
+import { aiError } from '../lib/errors.js';
 
 export const aiSource = (): AiSource => (env.aiEnabled ? 'ai' : 'mock');
 
@@ -88,7 +89,9 @@ export async function generateTodos(project: ProjectRecord, prompt: string, coun
     { role: 'user', content: `${projectContext(project)}\n\nFeature request:\n${prompt}` },
   ]);
   const parsed = draftSchema.safeParse(extractJson(reply));
-  if (!parsed.success) return mockGenerateTodos(prompt, count); // be forgiving: never leave the user empty-handed
+  if (!parsed.success || parsed.data.todos.length !== count) {
+    throw aiError('The AI response did not contain the requested Todo suggestions. Please retry.');
+  }
   return parsed.data.todos.slice(0, count);
 }
 
@@ -134,9 +137,9 @@ export interface SprintPlan {
 }
 
 const planSchema = z.object({
-  goal: z.string().trim().max(300).catch(''),
-  todoIds: z.array(z.string()),
-  reasoning: z.string().max(2000).catch(''),
+  goal: z.string().trim().min(1).max(300),
+  todoIds: z.array(z.string().min(1)),
+  reasoning: z.string().trim().min(1).max(2000),
 });
 
 export async function planSprint(project: ProjectRecord, capacity: number, focus?: string): Promise<SprintPlan> {
@@ -158,7 +161,9 @@ export async function planSprint(project: ProjectRecord, capacity: number, focus
     { role: 'user', content: `${projectContext(project)}\n\nCapacity: ${capacity} points.${focus ? `\nFocus: ${focus}` : ''}` },
   ]);
   const parsed = planSchema.safeParse(extractJson(reply));
-  if (!parsed.success) return mockPlanSprint(backlog, capacity, focus);
+  if (!parsed.success) {
+    throw aiError('The AI response was not a valid Sprint plan. Please retry.');
+  }
 
   // Never trust ids or math from the model: keep valid backlog ids, enforce capacity.
   const byId = new Map(backlog.map((t) => [t.id, t]));

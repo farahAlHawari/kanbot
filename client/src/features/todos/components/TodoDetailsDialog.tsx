@@ -20,6 +20,7 @@ import {
 import { listSprints } from '../../sprints/api/sprints-api';
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { getFieldErrors } from '../../../shared/api/errors';
+import { PriorityBadge, TaskTypeBadge, TodoStatusBadge } from '../../../shared/components/ui';
 import type { Sprint, StoryPoints, Todo, TodoPriority, TodoStatus, TodoType, UpdateTodoRequest } from '../../../shared/types/api';
 import { STORY_POINTS, TODO_PRIORITIES, TODO_STATUSES, TODO_TYPES } from '../../../shared/types/api';
 import { deleteTodo, updateTodo } from '../api/todos-api';
@@ -220,8 +221,13 @@ export function TodoDetailsDialog({
         aria-busy={pending}
       >
         <DialogTitle id="todo-details-title">
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{todo.key}</Typography>
-          {t('Todo details')}
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>{todo.key}</Typography>
+          <Typography component="span" variant="h3">{t('Todo details')}</Typography>
+          <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', mt: 1 }}>
+            <TaskTypeBadge type={fields.type} />
+            <TodoStatusBadge status={fields.status} />
+            <PriorityBadge priority={fields.priority} />
+          </Stack>
         </DialogTitle>
         <form onSubmit={handleSubmit} noValidate>
           <DialogContent dividers>

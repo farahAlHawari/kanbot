@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
@@ -36,12 +37,15 @@ import {
   Paper,
   Select,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import DragIndicatorOutlined from '@mui/icons-material/DragIndicatorOutlined';
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { ApiError } from '../../../shared/api/errors';
 import { EmptyState, ErrorState, LoadingState } from '../../../shared/components/ui';
+import { PriorityBadge, TaskTypeBadge } from '../../../shared/components/ui';
+import { todoTypeAccentSx } from '../../../shared/components/todo-visuals';
 import { useLocale } from '../../../app/providers/use-locale';
 import { TODO_STATUSES, type Sprint, type SprintBoardResponse, type Todo, type TodoStatus } from '../../../shared/types/api';
 import { SprintSummaryPanel } from '../../ai-assistant/components/SprintSummaryPanel';
@@ -52,6 +56,7 @@ import { moveTodo } from '../../todos/api/todos-api';
 import { TodoDetailsDialog } from '../../todos/components/TodoDetailsDialog';
 import { todosQueryKey } from '../../todos/hooks/use-backlog';
 import { sprintsQueryKey } from '../hooks/use-sprints';
+import { localDate } from '../../../shared/utils/dates';
 
 const columnLabels: Record<TodoStatus, string> = {
   todo: 'To Do',
@@ -59,12 +64,6 @@ const columnLabels: Record<TodoStatus, string> = {
   in_review: 'In Review',
   done: 'Done',
 };
-
-const typeLabels: Record<Todo['type'], string> = { task: 'Task', story: 'Story', bug: 'Bug' };
-const priorityLabels: Record<Todo['priority'], string> = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' };
-function dateOnly(date: Date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-}
 
 function dateLabel(date: string | null) {
   return date
@@ -75,7 +74,7 @@ function dateLabel(date: string | null) {
 function remainingDays(endDate: string | null) {
   if (!endDate) return null;
   const end = Date.parse(`${endDate}T00:00:00Z`);
-  const today = Date.parse(`${dateOnly(new Date())}T00:00:00Z`);
+  const today = Date.parse(`${localDate(new Date())}T00:00:00Z`);
   return Math.ceil((end - today) / 86_400_000);
 }
 
@@ -98,15 +97,107 @@ function updateBoardStats(board: SprintBoardResponse): SprintBoardResponse {
   };
 }
 
-function SortableTodoCard({ todo, onOpen, onStatusChange }: {
+function TodoCardBody({ todo, onOpen, onStatusChange, dragDisabled, dragHandle, interactive }: {
   todo: Todo;
   onOpen: () => void;
   onStatusChange: (status: TodoStatus) => void;
+  dragDisabled: boolean;
+  dragHandle: ReactNode;
+  interactive: boolean;
+}) {
+  const { t } = useLocale();
+
+  return (
+    <CardContent sx={{ p: '12px 14px', '&:last-child': { pb: '12px' }, minWidth: 0 }}>
+      <Stack spacing={1}>
+        <Stack direction="row" sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 0.5, minWidth: 0 }}>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0, flexWrap: 'wrap' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 700, fontFamily: '"JetBrains Mono Variable", ui-monospace, monospace', letterSpacing: '0.02em' }}
+            >
+              {todo.key}
+            </Typography>
+            <TaskTypeBadge type={todo.type} />
+          </Stack>
+          {dragHandle}
+        </Stack>
+        <Button
+          onClick={onOpen}
+          disabled={!interactive}
+          fullWidth
+          sx={{
+            minWidth: 0,
+            justifyContent: 'flex-start',
+            p: 0,
+            textAlign: 'left',
+            whiteSpace: 'normal',
+            textTransform: 'none',
+            color: 'text.primary',
+            '&:hover': { bgcolor: 'transparent', textDecoration: 'underline', textDecorationColor: 'var(--mui-palette-divider)' },
+          }}
+        >
+          <Typography sx={{ width: '100%', fontWeight: 600, fontSize: '0.8125rem', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+            {todo.title}
+          </Typography>
+        </Button>
+        {todo.description ? (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflowWrap: 'anywhere',
+              fontSize: '0.75rem',
+              lineHeight: 1.5,
+            }}
+          >
+            {todo.description}
+          </Typography>
+        ) : null}
+        <Stack direction="row" sx={{ columnGap: 0.75, rowGap: 0.75, flexWrap: 'wrap' }}>
+          <PriorityBadge priority={todo.priority} />
+          {todo.storyPoints !== null ? <Chip size="small" variant="outlined" label={`${todo.storyPoints} pts`} /> : null}
+          {todo.labels.map((label) => <Chip key={label} size="small" variant="outlined" label={label} />)}
+        </Stack>
+        {interactive ? (
+          <FormControl size="small" fullWidth>
+            <InputLabel id={`status-${todo.id}`}>{t('Status')}</InputLabel>
+            <Select
+              labelId={`status-${todo.id}`}
+              label={t('Status')}
+              value={todo.status}
+              disabled={dragDisabled}
+              onChange={(event) => onStatusChange(event.target.value as TodoStatus)}
+              onPointerDown={(event) => event.stopPropagation()}
+              sx={{ fontSize: '0.75rem' }}
+            >
+              {TODO_STATUSES.map((status) => (
+                <MenuItem key={status} value={status}>{t(columnLabels[status])}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        ) : null}
+      </Stack>
+    </CardContent>
+  );
+}
+
+function SortableTodoCard({ todo, onOpen, onStatusChange, dragDisabled }: {
+  todo: Todo;
+  onOpen: () => void;
+  onStatusChange: (status: TodoStatus) => void;
+  dragDisabled: boolean;
 }) {
   const { t } = useLocale();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: todo.id,
     data: { status: todo.status },
+    disabled: dragDisabled,
   });
   return (
     <Card
@@ -115,52 +206,37 @@ function SortableTodoCard({ todo, onOpen, onStatusChange }: {
       sx={{
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.4 : 1,
+        flexShrink: 0,
+        opacity: isDragging ? 0.45 : 1,
+        boxShadow: isDragging ? 'var(--shadow-md)' : 'var(--shadow-xs)',
+        '&:hover': { borderColor: 'primary.light', boxShadow: 'var(--shadow-sm)' },
+        ...todoTypeAccentSx(todo.type),
       }}
     >
-      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Stack spacing={1}>
-          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{todo.key}</Typography>
-            <IconButton
-              size="small"
-              aria-label={`${t('Reorder')} ${todo.key}`}
-              {...attributes}
-              {...listeners}
-              onClick={(event) => event.stopPropagation()}
-              sx={{ flexShrink: 0, cursor: isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
-            >
-              <DragIndicatorOutlined fontSize="small" />
-            </IconButton>
-          </Stack>
-          <Button
-            onClick={onOpen}
-            fullWidth
-            sx={{ minWidth: 0, justifyContent: 'flex-start', p: 0, textAlign: 'left', whiteSpace: 'normal', textTransform: 'none', color: 'text.primary' }}
-          >
-            <Typography sx={{ width: '100%', fontWeight: 600, lineHeight: 1.45, overflowWrap: 'anywhere' }}>{todo.title}</Typography>
-          </Button>
-          <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
-            <Chip size="small" variant="outlined" label={t(typeLabels[todo.type])} />
-            <Chip size="small" label={t(priorityLabels[todo.priority])} />
-            {todo.storyPoints !== null ? <Chip size="small" variant="outlined" label={`${todo.storyPoints} pts`} /> : null}
-          </Stack>
-          <FormControl size="small" fullWidth>
-            <InputLabel id={`status-${todo.id}`}>{t('Status')}</InputLabel>
-            <Select
-              labelId={`status-${todo.id}`}
-              label={t('Status')}
-              value={todo.status}
-              onChange={(event) => onStatusChange(event.target.value as TodoStatus)}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              {TODO_STATUSES.map((status) => (
-                <MenuItem key={status} value={status}>{t(columnLabels[status])}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Stack>
-      </CardContent>
+      <TodoCardBody
+        todo={todo}
+        onOpen={onOpen}
+        onStatusChange={onStatusChange}
+        dragDisabled={dragDisabled}
+        interactive
+        dragHandle={(
+          <Tooltip title={dragDisabled ? t('A move is in progress') : t('Drag to reorder')}>
+            <span>
+              <IconButton
+                size="small"
+                aria-label={`${t('Reorder')} ${todo.key}`}
+                disabled={dragDisabled}
+                {...attributes}
+                {...listeners}
+                onClick={(event) => event.stopPropagation()}
+                sx={{ flexShrink: 0, cursor: dragDisabled ? 'default' : isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
+              >
+                <DragIndicatorOutlined fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+      />
     </Card>
   );
 }
@@ -170,11 +246,13 @@ function BoardColumn({
   todos,
   onOpen,
   onStatusChange,
+  dragDisabled,
 }: {
   status: TodoStatus;
   todos: Todo[];
   onOpen: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
+  dragDisabled: boolean;
 }) {
   const { t } = useLocale();
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status}`, data: { status } });
@@ -184,30 +262,36 @@ function BoardColumn({
       variant="outlined"
       sx={{
         p: 1.5,
-        height: 'clamp(280px, calc(100dvh - 460px), 560px)',
+        height: { xs: 'clamp(280px, 55dvh, 560px)', md: 'clamp(360px, calc(100dvh - 320px), 720px)' },
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
         bgcolor: isOver ? 'action.hover' : 'background.subtle',
+        borderColor: isOver ? 'primary.light' : 'divider',
         scrollSnapAlign: 'start',
       }}
     >
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.25, pb: 1, borderBottom: 1, borderColor: 'divider' }}>
         <Typography component="h2" variant="h3">{t(columnLabels[status])}</Typography>
-        <Chip size="small" label={todos.length} aria-label={`${t(columnLabels[status])} ${t('count')}`} />
+        <Chip size="small" variant="outlined" label={todos.length} aria-label={`${t(columnLabels[status])} ${t('count')}`} />
       </Stack>
       <SortableContext items={todos.map((todo) => todo.id)} strategy={verticalListSortingStrategy}>
-        <Stack spacing={1} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehaviorY: 'contain', pr: 0.5 }}>
+        <Stack spacing={1} sx={{ flex: 1, minHeight: 0, alignItems: 'stretch', overflowY: 'auto', overscrollBehaviorY: 'contain', pr: 0.5 }}>
           {todos.map((todo) => (
             <SortableTodoCard
               key={todo.id}
               todo={todo}
               onOpen={() => onOpen(todo)}
               onStatusChange={(nextStatus) => onStatusChange(todo, nextStatus)}
+              dragDisabled={dragDisabled}
             />
           ))}
-          {!todos.length ? <Typography variant="body2" color="text.secondary">{t('No Todos')}</Typography> : null}
+          {!todos.length ? (
+            <Box sx={{ minHeight: 72, display: 'grid', placeItems: 'center', border: '1px dashed', borderColor: 'divider', borderRadius: 1, color: 'text.secondary' }}>
+              <Typography variant="body2">{t('No Todos')}</Typography>
+            </Box>
+          ) : null}
         </Stack>
       </SortableContext>
     </Paper>
@@ -220,6 +304,9 @@ function CompleteSprintDialog({
   todos,
   pending,
   error,
+  summaryError,
+  completedSprintId,
+  projectId,
   onClose,
   onSubmit,
 }: {
@@ -228,10 +315,16 @@ function CompleteSprintDialog({
   todos: Todo[];
   pending: boolean;
   error: string | null;
+  /** Non-null when the Sprint completed but the optional AI summary generation failed. */
+  summaryError: string | null;
+  /** Non-null once the Sprint has been successfully completed. */
+  completedSprintId: string | null;
+  projectId: string;
   onClose: () => void;
   onSubmit: (destination: string, generateSummary: boolean) => Promise<void>;
 }) {
   const { t } = useLocale();
+  const navigate = useNavigate();
   const [destination, setDestination] = useState('backlog');
   const [generateSummary, setGenerateSummary] = useState(false);
   const [fieldError, setFieldError] = useState('');
@@ -240,13 +333,44 @@ function CompleteSprintDialog({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    // Prevent double-submit
+    if (pending || completedSprintId) return;
     if (destination !== 'backlog' && !plannedSprints.some((sprintOption) => sprintOption.id === destination)) {
       setFieldError(t('Choose the backlog or a planned Sprint.'));
       return;
     }
     setFieldError('');
     void onSubmit(destination, generateSummary);
+  }
+
+  // Sprint completed successfully but summary failed — show result and retry option
+  if (completedSprintId) {
+    return (
+      <Dialog open onClose={onClose} fullWidth maxWidth="sm" aria-labelledby="complete-sprint-title">
+        <DialogTitle id="complete-sprint-title">{sprint.name} {t('completed')}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <Alert severity="success">{t('The Sprint was completed successfully.')}</Alert>
+            {summaryError ? (
+              <Alert severity="warning" role="alert">
+                {t('AI summary could not be generated:')} {summaryError}
+                <br />
+                {t('You can generate it later from the Sprint details page.')}
+              </Alert>
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={onClose}>{t('Close')}</Button>
+          <Button
+            variant="contained"
+            onClick={() => navigate(`/projects/${projectId}/sprints/${completedSprintId}`)}
+          >
+            {t('View Sprint details')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
   }
 
   return (
@@ -311,9 +435,13 @@ export function BoardPage() {
   });
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [completedSprintId, setCompletedSprintId] = useState<string | null>(null);
+  const [completeSummaryError, setCompleteSummaryError] = useState<string | null>(null);
   const [dragAnnouncement, setDragAnnouncement] = useState('');
+  const [activeId, setActiveId] = useState<string | null>(null);
   const board = boardQuery.data;
   const todos = board ? TODO_STATUSES.flatMap((status) => board.columns[status]) : [];
+  const activeTodo = todos.find((todo) => todo.id === activeId);
   const plannedSprints = sprintsQuery.data?.sprints.filter((sprint) => sprint.status === 'planned') ?? [];
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -398,9 +526,13 @@ export function BoardPage() {
         queryClient.invalidateQueries({ queryKey: ['sprint', completion.sprint.id] }),
       ]);
       notify(`${completion.sprint.name} completed.`);
-      if (summaryError) notify(`Sprint completed, but summary generation failed: ${summaryError}`, 'error');
-      setCompleteOpen(false);
-      navigate(`/projects/${projectId}/sprints/${completion.sprint.id}`);
+      // Surface completion result inside the dialog instead of immediately navigating away.
+      // The dialog shows a success panel; the user chooses when to navigate.
+      setCompletedSprintId(completion.sprint.id);
+      setCompleteSummaryError(summaryError);
+    },
+    onError: () => {
+      // Error is surfaced via completeMutation.error in the dialog.
     },
   });
 
@@ -428,7 +560,15 @@ export function BoardPage() {
 
   if (sprintsQuery.isLoading) return <LoadingState label="Loading active Sprint" rows={2} />;
   if (sprintsQuery.isError) {
-    return <ErrorState message={sprintsQuery.error instanceof Error ? sprintsQuery.error.message : 'Unable to load Sprints.'} onRetry={() => void sprintsQuery.refetch()} />;
+    const unavailable = sprintsQuery.error instanceof ApiError && (sprintsQuery.error.status === 403 || sprintsQuery.error.status === 404);
+    return (
+      <ErrorState
+        message={sprintsQuery.error instanceof Error ? sprintsQuery.error.message : 'Unable to load Sprints.'}
+        {...(unavailable
+          ? { action: <Button component={Link} to="/projects">{t('Go to projects')}</Button> }
+          : { onRetry: () => void sprintsQuery.refetch() })}
+      />
+    );
   }
   if (!activeSprint) {
     return (
@@ -443,7 +583,15 @@ export function BoardPage() {
   }
   if (boardQuery.isLoading) return <LoadingState label="Loading Sprint board" rows={4} />;
   if (boardQuery.isError || !board) {
-    return <ErrorState message={boardQuery.error instanceof Error ? boardQuery.error.message : 'Unable to load the Sprint board.'} onRetry={() => void boardQuery.refetch()} />;
+    const unavailable = boardQuery.error instanceof ApiError && (boardQuery.error.status === 403 || boardQuery.error.status === 404);
+    return (
+      <ErrorState
+        message={boardQuery.error instanceof Error ? boardQuery.error.message : 'Unable to load the Sprint board.'}
+        {...(unavailable
+          ? { action: <Button component={Link} to="/projects">{t('Go to projects')}</Button> }
+          : { onRetry: () => void boardQuery.refetch() })}
+      />
+    );
   }
 
   const sprint = board.sprint;
@@ -455,6 +603,8 @@ export function BoardPage() {
     ? `${t('Remaining days')}: ${t('Not set')}`
     : days < 0
       ? `${Math.abs(days)} ${t('days overdue')}`
+      : days === 0
+        ? t('Ends today')
       : `${days} ${t('days remaining')}`;
 
   return (
@@ -469,6 +619,8 @@ export function BoardPage() {
           color="success"
           onClick={() => {
             completeMutation.reset();
+            setCompletedSprintId(null);
+            setCompleteSummaryError(null);
             setCompleteOpen(true);
           }}
         >
@@ -494,8 +646,6 @@ export function BoardPage() {
         </Stack>
       </Paper>
 
-      <SprintSummaryPanel sprint={sprint} projectId={projectId} />
-
       {moveMutation.error ? (
         <Alert
           severity="error"
@@ -513,6 +663,7 @@ export function BoardPage() {
         collisionDetection={collisionDetection}
         onDragStart={(event) => {
           const activeTodo = todos.find((todo) => todo.id === event.active.id);
+          setActiveId(String(event.active.id));
           setDragAnnouncement(activeTodo ? `Dragging ${activeTodo.key}` : 'Dragging Todo');
         }}
         onDragOver={(event) => {
@@ -521,16 +672,20 @@ export function BoardPage() {
         }}
         onDragEnd={(event) => {
           onDragEnd(event);
+          setActiveId(null);
           const targetStatus = event.over?.data.current?.status as TodoStatus | undefined;
           setDragAnnouncement(targetStatus ? `Todo moved to ${columnLabels[targetStatus]}` : 'Drag cancelled');
         }}
-        onDragCancel={() => setDragAnnouncement('Drag cancelled')}
+        onDragCancel={() => {
+          setActiveId(null);
+          setDragAnnouncement('Drag cancelled');
+        }}
       >
         <Box sx={{
           display: 'grid',
           gridTemplateColumns: {
             xs: 'repeat(4, minmax(min(86vw, 320px), 1fr))',
-            md: 'repeat(4, minmax(280px, 1fr))',
+            md: 'repeat(2, minmax(280px, 1fr))',
             xl: 'repeat(4, minmax(0, 1fr))',
           },
           gap: 1.5,
@@ -548,10 +703,30 @@ export function BoardPage() {
               todos={board.columns[status]}
               onOpen={setSelectedTodo}
               onStatusChange={changeStatus}
+              dragDisabled={moveMutation.isPending}
             />
           ))}
         </Box>
+        <DragOverlay>
+          {activeTodo ? (
+            <Card
+              aria-hidden="true"
+              variant="outlined"
+              sx={{ borderRadius: 2, boxShadow: 'var(--shadow-xs)', pointerEvents: 'none', ...todoTypeAccentSx(activeTodo.type) }}
+            >
+              <TodoCardBody
+                todo={activeTodo}
+                onOpen={() => undefined}
+                onStatusChange={() => undefined}
+                dragDisabled
+                dragHandle={null}
+                interactive={false}
+              />
+            </Card>
+          ) : null}
+        </DragOverlay>
       </DndContext>
+      <SprintSummaryPanel sprint={sprint} projectId={projectId} />
       <Box
         role="status"
         aria-live="polite"
@@ -575,7 +750,16 @@ export function BoardPage() {
           todos={todos}
           pending={completeMutation.isPending}
           error={completeMutation.error instanceof Error ? completeMutation.error.message : null}
-          onClose={() => setCompleteOpen(false)}
+          summaryError={completeSummaryError}
+          completedSprintId={completedSprintId}
+          projectId={projectId}
+          onClose={() => {
+            setCompleteOpen(false);
+            // If sprint was completed navigate now (dialog closed by user)
+            if (completedSprintId) {
+              navigate(`/projects/${projectId}/sprints/${completedSprintId}`);
+            }
+          }}
           onSubmit={(destination, generateSummary) =>
             completeMutation.mutateAsync({ destination, generateSummary }).then(
               () => undefined,

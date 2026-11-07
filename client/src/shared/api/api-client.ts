@@ -36,7 +36,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   } catch {
-    throw new ApiError(0, 'NETWORK_ERROR', 'Cannot reach the server. Is it running?');
+    throw new ApiError(0, 'NETWORK_ERROR', "Can't reach the server. Check your connection and try again.");
   }
 
   if (response.status === 204) return undefined as T;

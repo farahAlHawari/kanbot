@@ -1,5 +1,5 @@
 import { env } from '../config/env.js';
-import { aiError } from '../lib/errors.js';
+import { AppError, aiError } from '../lib/errors.js';
 
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant';
@@ -8,7 +8,7 @@ export interface LlmMessage {
 
 /**
  * One non-streaming call to any OpenAI-compatible Chat Completions API
- * (OpenRouter, Groq, Gemini's OpenAI endpoint, Ollama, OpenAI...).
+ * (Groq, OpenRouter, Gemini's OpenAI endpoint, Ollama, OpenAI...).
  */
 export async function complete(messages: LlmMessage[], opts: { maxTokens?: number; temperature?: number } = {}): Promise<string> {
   let res: Response;
@@ -29,25 +29,42 @@ export async function complete(messages: LlmMessage[], opts: { maxTokens?: numbe
       signal: AbortSignal.timeout(env.AI_TIMEOUT_MS),
     });
   } catch (err) {
-    const timedOut = err instanceof Error && err.name === 'TimeoutError';
+    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
     throw aiError(timedOut ? 'The AI took too long to answer. Try again.' : 'Could not reach the AI provider.');
   }
 
-  const text = await res.text();
   if (!res.ok) {
-    console.error(`AI provider error ${res.status}: ${text.slice(0, 500)}`);
     if (res.status === 401 || res.status === 403) throw aiError('The AI provider rejected the API key (check AI_API_KEY).');
-    if (res.status === 429) throw aiError('The AI provider rate limit was reached. Wait a moment and try again.');
-    throw aiError(`The AI provider returned an error (${res.status}).`);
+    if (res.status === 429) {
+      throw new AppError(429, 'RATE_LIMITED', 'The AI provider rate limit was reached. Wait a moment and try again.');
+    }
+    if (res.status === 400 || res.status === 404) {
+      throw aiError('The AI provider rejected the model or request. Check AI_MODEL and AI_BASE_URL.');
+    }
+    throw aiError('The AI provider is unavailable or returned an error. Try again shortly.');
   }
+
+  let text: string;
   try {
-    const json = JSON.parse(text) as { choices?: { message?: { content?: string | null } }[] };
-    const content = json.choices?.[0]?.message?.content?.trim();
-    if (content) return content;
-  } catch {
-    // fall through
+    text = await res.text();
+  } catch (err) {
+    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    throw aiError(timedOut ? 'The AI took too long to answer. Try again.' : 'Could not reach the AI provider.');
   }
-  throw aiError('The AI returned an empty answer. Try again.');
+
+  try {
+    const json: unknown = JSON.parse(text);
+    if (json && typeof json === 'object' && 'choices' in json && Array.isArray(json.choices)) {
+      const message = json.choices[0]?.message;
+      if (message && typeof message === 'object' && 'content' in message && typeof message.content === 'string') {
+        const content = message.content.trim();
+        if (content) return content;
+      }
+    }
+  } catch {
+    throw aiError('The AI provider returned an invalid response. Try again.');
+  }
+  throw aiError('The AI provider returned an empty or invalid response. Try again.');
 }
 
 /** Pulls the first JSON object out of a reply (models love wrapping JSON in ```fences``` or prose). */

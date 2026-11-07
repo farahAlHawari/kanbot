@@ -10,7 +10,7 @@ const schema = z.object({
   DATA_FILE: z.string().default('./data/db.json'),
   // AI — leave AI_API_KEY empty to use the built-in mock assistant.
   AI_API_KEY: z.string().default(''),
-  AI_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
+  AI_BASE_URL: z.string().default('https://api.groq.com/openai/v1'),
   AI_MODEL: z.string().default(''),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 });

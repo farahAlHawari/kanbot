@@ -6,6 +6,7 @@ import { FeedbackProvider } from './FeedbackProvider';
 import { theme } from '../theme/theme';
 import { router } from '../router/router';
 import { AuthProvider } from '../../features/auth';
+import { ErrorBoundary } from '../../shared/components/ErrorBoundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,16 +17,18 @@ const queryClient = new QueryClient({
 
 export function AppProviders() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <InitColorSchemeScript attribute="data" defaultMode="light" />
-      <ThemeProvider theme={theme} defaultMode="light" disableTransitionOnChange>
-        <CssBaseline enableColorScheme />
-        <FeedbackProvider>
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </FeedbackProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <InitColorSchemeScript attribute="data" defaultMode="light" />
+        <ThemeProvider theme={theme} defaultMode="light" disableTransitionOnChange>
+          <CssBaseline enableColorScheme />
+          <FeedbackProvider>
+            <AuthProvider>
+              <RouterProvider router={router} />
+            </AuthProvider>
+          </FeedbackProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

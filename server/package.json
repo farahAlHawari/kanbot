@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test src/ai/client.test.ts",
     "seed": "tsx src/scripts/seed.ts",
     "smoke": "tsx src/scripts/smoke.ts"
   },

@@ -28,6 +28,7 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
   const [prompt, setPrompt] = useState('');
   const [count, setCount] = useState(5);
   const [drafts, setDrafts] = useState<DraftTodo[]>([]);
+  const [draftIds, setDraftIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<boolean[]>([]);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -37,6 +38,7 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
     mutationFn: () => generateTodos(projectId, { prompt: prompt.trim(), count }),
     onSuccess: ({ todos }) => {
       setDrafts(todos.map((todo) => ({ ...todo })));
+      setDraftIds(todos.map(() => crypto.randomUUID()));
       setSelected(todos.map(() => true));
       setError(null);
     },
@@ -68,14 +70,19 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
     },
   });
 
-  function handleGenerate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function generateSuggestions() {
     if (generateMutation.isPending || prompt.trim().length < 3) {
       if (prompt.trim().length < 3) setError(t('Describe what the Todos should cover (at least 3 characters).'));
       return;
     }
+    if (drafts.length && !window.confirm(t('Generate new suggestions and replace your current review?'))) return;
     setError(null);
     generateMutation.mutate();
+  }
+
+  function handleGenerate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    generateSuggestions();
   }
 
   const selectedCount = selected.filter(Boolean).length;
@@ -88,20 +95,22 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
   }
 
   return (
-    <Dialog open onClose={generateMutation.isPending || saveMutation.isPending ? undefined : onClose} fullWidth maxWidth="md">
-      <DialogTitle>{t('Generate Todos with AI')}</DialogTitle>
-      <form onSubmit={handleGenerate}>
-        <DialogContent dividers>
+    <Dialog open onClose={generateMutation.isPending || saveMutation.isPending ? undefined : onClose} fullWidth maxWidth="md" aria-labelledby="generate-todos-dialog-title">
+      <DialogTitle id="generate-todos-dialog-title">{t('Generate Todos with AI')}</DialogTitle>
+    <DialogContent dividers>
+      <Stack spacing={2}>
+        {error ? <Alert severity="error" role="alert">{error}</Alert> : null}
+        <form onSubmit={handleGenerate}>
           <Stack spacing={2}>
-            {error ? <Alert severity="error" role="alert">{error}</Alert> : null}
-            <TextField
-              label={t('What should these Todos cover?')}
+          <TextField
+            label={t('What should these Todos cover?')}
               fullWidth
               multiline
               minRows={2}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               required
+              autoFocus
               slotProps={{ htmlInput: { minLength: 3, maxLength: 2000 } }}
               helperText={t('Describe the feature or work area.')}
             />
@@ -119,11 +128,13 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
               {generateMutation.isPending ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}
               {t('Generate suggestions')}
             </Button>
-            {drafts.length ? (
-              <Stack spacing={1}>
-                <Typography variant="h3">{t('Review suggestions')}</Typography>
-                {drafts.map((draft, index) => (
-                  <Stack key={`${draft.title}-${index}`} direction="row" spacing={1} sx={{ alignItems: 'flex-start', border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+            </Stack>
+          </form>
+          {drafts.length ? (
+            <Stack spacing={1}>
+              <Typography variant="h3">{t('Review suggestions')}</Typography>
+              {drafts.map((draft, index) => (
+                  <Stack key={draftIds[index]} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: 'flex-start', border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
                     <FormControlLabel
                       control={(
                         <Checkbox
@@ -136,7 +147,7 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
                       label={`${t('Include suggestion')} ${index + 1}`}
                       sx={{ alignItems: 'flex-start', m: 0 }}
                     />
-                    <Stack spacing={1} sx={{ flex: 1 }}>
+                    <Stack spacing={1} sx={{ flex: 1, width: { xs: '100%', sm: 'auto' }, minWidth: 0 }}>
                       <TextField label={t('Title')} value={draft.title} onChange={(event) => updateDraft(index, { title: event.target.value })} size="small" fullWidth />
                       <TextField label={t('Description')} value={draft.description} onChange={(event) => updateDraft(index, { description: event.target.value })} size="small" fullWidth multiline minRows={2} />
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
@@ -153,27 +164,26 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
                       </Stack>
                     </Stack>
                   </Stack>
-                ))}
-              </Stack>
-            ) : null}
-            <Typography variant="caption" color="text.secondary">
-              {t('AI can make mistakes. Review before saving.')}
-            </Typography>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} disabled={generateMutation.isPending || saveMutation.isPending}>{t('Cancel')}</Button>
-          {drafts.length ? (
-            <Button type="button" variant="contained" disabled={!canSave} onClick={() => saveMutation.mutate()}>
-              {saveMutation.isPending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-              {t('Add')} {selectedCount} {t('to backlog')}
-            </Button>
+              ))}
+            </Stack>
           ) : null}
-          {generateMutation.error instanceof ApiError && (generateMutation.error.status === 429 || generateMutation.error.status === 502) ? (
-            <Button onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending}>{t('Retry')}</Button>
-          ) : null}
-        </DialogActions>
-      </form>
+          <Typography variant="caption" color="text.secondary">
+            {t('AI can make mistakes. Review before saving.')}
+          </Typography>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} disabled={generateMutation.isPending || saveMutation.isPending}>{t('Cancel')}</Button>
+        {drafts.length ? (
+          <Button type="button" variant="contained" disabled={!canSave} onClick={() => saveMutation.mutate()}>
+            {saveMutation.isPending ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
+            {t('Add')} {selectedCount} {t('to backlog')}
+          </Button>
+        ) : null}
+        {generateMutation.error instanceof ApiError && (generateMutation.error.status === 429 || generateMutation.error.status === 502) ? (
+          <Button onClick={generateSuggestions} disabled={generateMutation.isPending}>{t('Retry')}</Button>
+        ) : null}
+      </DialogActions>
     </Dialog>
   );
 }

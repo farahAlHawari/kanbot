@@ -20,9 +20,18 @@ import {
   type ButtonProps,
   type TextFieldProps,
 } from '@mui/material';
+import ArrowDownwardOutlined from '@mui/icons-material/ArrowDownwardOutlined';
+import ArrowUpwardOutlined from '@mui/icons-material/ArrowUpwardOutlined';
+import AssignmentOutlined from '@mui/icons-material/AssignmentOutlined';
+import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
+import BugReportOutlined from '@mui/icons-material/BugReportOutlined';
+import FiberManualRecordOutlined from '@mui/icons-material/FiberManualRecordOutlined';
+import KeyboardDoubleArrowUpOutlined from '@mui/icons-material/KeyboardDoubleArrowUpOutlined';
+import RemoveOutlined from '@mui/icons-material/RemoveOutlined';
 import kanbotLogo from '../../assets/kanbot-logo.svg';
 import InboxOutlined from '@mui/icons-material/InboxOutlined';
 import { useLocale } from '../../app/providers/use-locale';
+import type { TodoPriority, TodoStatus, TodoType } from '../types/api';
 
 export function Button(props: ButtonProps) {
   return <MuiButton {...props} />;
@@ -72,6 +81,117 @@ export function Select({ label, value, options, onChange, disabled }: SelectProp
 
 export function Badge({ label, color = 'default' }: { label: string; color?: 'default' | 'primary' | 'success' | 'warning' | 'error' }) {
   return <Chip size="small" label={label} color={color} />;
+}
+
+const todoTypeLabels: Record<TodoType, string> = {
+  task: 'Task',
+  story: 'Story',
+  bug: 'Bug',
+};
+
+const todoTypeIcons = {
+  task: AssignmentOutlined,
+  story: AutoStoriesOutlined,
+  bug: BugReportOutlined,
+};
+
+const todoStatusLabels: Record<TodoStatus, string> = {
+  todo: 'To Do',
+  in_progress: 'In Progress',
+  in_review: 'In Review',
+  done: 'Done',
+};
+
+const todoStatusTokens: Record<TodoStatus, string> = {
+  todo: 'todo',
+  in_progress: 'progress',
+  in_review: 'review',
+  done: 'done',
+};
+
+const priorityLabels: Record<TodoPriority, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  urgent: 'Urgent',
+};
+
+const priorityIcons = {
+  low: ArrowDownwardOutlined,
+  medium: RemoveOutlined,
+  high: ArrowUpwardOutlined,
+  urgent: KeyboardDoubleArrowUpOutlined,
+};
+
+export function TaskTypeBadge({ type }: { type: TodoType }) {
+  const { t } = useLocale();
+  const Icon = todoTypeIcons[type];
+  return (
+    <Chip
+      size="small"
+      icon={<Icon aria-hidden="true" />}
+      label={t(todoTypeLabels[type])}
+      aria-label={`${t(todoTypeLabels[type])} task type`}
+      sx={{
+        color: `var(--todo-type-${type})`,
+        bgcolor: `var(--todo-type-${type}-bg)`,
+        border: `1px solid var(--todo-type-${type}-border)`,
+        '& .MuiChip-icon': { color: 'inherit', fontSize: 15 },
+      }}
+    />
+  );
+}
+
+export function TodoStatusBadge({ status }: { status: TodoStatus }) {
+  const { t } = useLocale();
+  const token = todoStatusTokens[status];
+  return (
+    <Chip
+      size="small"
+      icon={<FiberManualRecordOutlined aria-hidden="true" />}
+      label={t(todoStatusLabels[status])}
+      aria-label={`${t(todoStatusLabels[status])} status`}
+      sx={{
+        color: `var(--todo-status-${token}-text)`,
+        bgcolor: `var(--todo-status-${token}-bg)`,
+        border: `1px solid var(--todo-status-${token}-border)`,
+        '& .MuiChip-icon': { color: 'inherit', fontSize: 10 },
+      }}
+    />
+  );
+}
+
+export function PriorityBadge({ priority }: { priority: TodoPriority }) {
+  const { t } = useLocale();
+  const Icon = priorityIcons[priority];
+  const urgent = priority === 'urgent';
+  const high = priority === 'high';
+  return (
+    <Chip
+      size="small"
+      icon={<Icon aria-hidden="true" />}
+      label={t(priorityLabels[priority])}
+      aria-label={`${t(priorityLabels[priority])} priority`}
+      sx={{
+        color: urgent
+          ? 'var(--todo-priority-urgent-text)'
+          : high
+            ? 'var(--mui-palette-tint-warning-text)'
+            : 'var(--mui-palette-text-secondary)',
+        bgcolor: urgent
+          ? 'var(--todo-priority-urgent-bg)'
+          : high
+            ? 'var(--mui-palette-tint-warning-bg)'
+            : 'var(--mui-palette-background-subtle)',
+        border: `1px solid ${urgent
+          ? 'var(--todo-priority-urgent-border)'
+          : high
+            ? 'var(--mui-palette-tint-warning-border)'
+            : 'var(--mui-palette-divider)'}`,
+        '& .MuiChip-icon': { color: 'inherit', fontSize: 15 },
+      }}
+    />
+  );
 }
 
 export function Card({ children, title }: PropsWithChildren<{ title?: string }>) {
@@ -164,26 +284,33 @@ export function LoadingState({ label = 'Loading', rows = 3 }: { label?: string; 
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({ message, onRetry, action }: { message: string; onRetry?: () => void; action?: ReactNode }) {
   const { t } = useLocale();
   return (
     <MuiCard variant="outlined" sx={{ borderColor: 'error.light' }}>
       <CardContent sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
         <Alert severity="error" role="alert" sx={{ flex: 1, minWidth: 220, p: 0, bgcolor: 'transparent' }}>{t(message)}</Alert>
-        {onRetry ? <MuiButton color="error" variant="outlined" size="small" onClick={onRetry}>{t('Retry')}</MuiButton> : null}
+        {action ?? (onRetry ? <MuiButton color="error" variant="outlined" size="small" onClick={onRetry}>{t('Retry')}</MuiButton> : null)}
       </CardContent>
     </MuiCard>
   );
 }
 
-export function Toast({ open, message, severity = 'success', onClose }: {
+export function Toast({ open, message, severity = 'success', onClose, onExited }: {
   open: boolean;
   message: string;
   severity?: AlertColor;
   onClose: () => void;
+  onExited?: () => void;
 }) {
   return (
-    <Snackbar open={open} autoHideDuration={5000} onClose={onClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+    <Snackbar
+      open={open}
+      autoHideDuration={5000}
+      onClose={onClose}
+      slotProps={{ transition: { onExited } }}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+    >
       <Alert onClose={onClose} severity={severity} variant="filled" role="status">{message}</Alert>
     </Snackbar>
   );

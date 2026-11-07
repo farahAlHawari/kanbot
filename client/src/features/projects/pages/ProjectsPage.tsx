@@ -26,6 +26,8 @@ import { EmptyState, ErrorState } from '../../../shared/components/ui';
 import type { CreateProjectRequest, ProjectWithStats, UpdateProjectRequest } from '../../../shared/types/api';
 import { createProject, deleteProject, updateProject } from '../api/projects-api';
 import { PROJECTS_QUERY_KEY, useProjects } from '../hooks/use-projects';
+import { todosQueryKey } from '../../todos/hooks/use-backlog';
+import { sprintsQueryKey } from '../../sprints/hooks/use-sprints';
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { useLocale } from '../../../app/providers/use-locale';
 
@@ -158,6 +160,7 @@ export function ProjectsPage() {
   const { notify } = useFeedback();
   const [editingProject, setEditingProject] = useState<ProjectWithStats | null>(null);
   const [deletingProject, setDeletingProject] = useState<ProjectWithStats | null>(null);
+  const [deletingProjectName, setDeletingProjectName] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const projects = data?.projects ?? [];
   const createOpen = searchParams.get('create') === '1';
@@ -184,8 +187,10 @@ export function ProjectsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteProject,
-    onSuccess: async () => {
+    onSuccess: async (_result, projectId) => {
       const deletedProject = deletingProject;
+      queryClient.removeQueries({ queryKey: todosQueryKey(projectId) });
+      queryClient.removeQueries({ queryKey: sprintsQueryKey(projectId) });
       await refreshProjects();
       setDeletingProject(null);
       setDeleteError(null);
@@ -219,6 +224,7 @@ export function ProjectsPage() {
   function openDeleteDialog(project: ProjectWithStats) {
     deleteMutation.reset();
     setDeleteError(null);
+    setDeletingProjectName(project.name);
     setDeletingProject(project);
   }
 
@@ -227,7 +233,10 @@ export function ProjectsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
         <Box>
           <Typography component="h1" variant="h2">{t('Your projects')}</Typography>
-          <Typography color="text.secondary">{projects.length} {t(projects.length === 1 ? 'project' : 'projects')} · {t('Manage your backlogs and sprint workspaces.')}</Typography>
+          <Typography color="text.secondary">
+            {!isLoading && !isError ? `${projects.length} ${t(projects.length === 1 ? 'project' : 'projects')} · ` : null}
+            {t('Manage your backlogs and sprint workspaces.')}
+          </Typography>
         </Box>
         <Button variant="contained" onClick={openCreateDialog}>{t('Create project')}</Button>
       </Box>
@@ -332,6 +341,7 @@ export function ProjectsPage() {
 
       <Dialog
         open={Boolean(deletingProject)}
+        slotProps={{ transition: { onExited: () => setDeletingProjectName('') } }}
         onClose={() => {
           if (!deleteMutation.isPending) setDeletingProject(null);
         }}
@@ -341,7 +351,7 @@ export function ProjectsPage() {
         <DialogContent>
           {deleteError ? <Alert severity="error" sx={{ mb: 2 }} role="alert">{deleteError}</Alert> : null}
           <Typography>
-            {t('Delete')} <strong>{deletingProject?.name}</strong>? {t('All of its sprints and todos will be permanently deleted.')}
+            {t('Delete')} <strong>{deletingProject?.name ?? deletingProjectName}</strong>? {t('All of its sprints and todos will be permanently deleted.')}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
