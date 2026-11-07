@@ -281,3 +281,38 @@ test('rejects malformed Sprint plans instead of returning a mock plan', async ()
     db.data.todos = previousTodos;
   }
 });
+
+test('mock Sprint planning can include unestimated backlog Todos within capacity', async () => {
+  const todo = {
+    id: 'ai-test-unestimated-todo',
+    projectId: project.id,
+    sprintId: null,
+    key: 'AIT-2',
+    title: 'Unestimated test Todo',
+    description: '',
+    type: 'task' as const,
+    status: 'todo' as const,
+    priority: 'medium' as const,
+    storyPoints: null,
+    labels: [],
+    dueDate: null,
+    order: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    completedAt: null,
+  };
+  const previousTodos = db.data.todos;
+  const previousAiEnabled = env.aiEnabled;
+  db.data.todos = [...previousTodos, todo];
+  env.aiEnabled = false;
+
+  try {
+    const plan = await planSprint(project, 1);
+    assert.ok(plan.todoIds.includes(todo.id));
+    assert.ok(plan.totalPoints <= 1);
+    assert.match(plan.reasoning, /count as 0 points/);
+  } finally {
+    db.data.todos = previousTodos;
+    env.aiEnabled = previousAiEnabled;
+  }
+});

@@ -163,10 +163,16 @@ await step('ai: status, generate todos, plan sprint, chat (mock)', async () => {
   assert.equal(list.json.todos.length, 3);
   assert.equal(list.json.todos[1].type, 'bug');
   assert.equal((await call('POST', `/projects/${projectId}/ai/generate-todos`, { prompt: '' })).status, 400);
-  const plan = await call('POST', `/projects/${projectId}/ai/plan-sprint`, { capacity: 5 });
+  const plan = await call('POST', `/projects/${projectId}/ai/plan-sprint`, { capacity: 8 });
   assert.equal(plan.status, 200);
-  assert.ok(plan.json.totalPoints <= 5);
+  assert.ok(plan.json.todoIds.includes(ids[3]));
+  assert.ok(plan.json.totalPoints <= 8);
   assert.ok(plan.json.reasoning.length > 0);
+  const planned = await call('POST', `/projects/${projectId}/sprints`, { goal: plan.json.goal, todoIds: plan.json.todoIds });
+  assert.equal(planned.status, 201);
+  assert.equal(planned.json.sprint.status, 'planned');
+  assert.ok((await call('GET', `/projects/${projectId}/todos?sprintId=backlog`)).json.todos.every((todo: { id: string }) => !plan.json.todoIds.includes(todo.id)));
+  assert.equal((await call('DELETE', `/sprints/${planned.json.sprint.id}`)).status, 204);
   const chat = await call('POST', `/projects/${projectId}/ai/chat`, { messages: [{ role: 'user', content: 'How is the sprint going?' }] });
   assert.equal(chat.json.message.role, 'assistant');
   assert.match(chat.json.message.content, /Sprint 1/);

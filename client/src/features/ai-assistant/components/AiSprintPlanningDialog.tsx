@@ -30,6 +30,7 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
   const [capacity, setCapacity] = useState(30);
   const [focus, setFocus] = useState('');
   const [goal, setGoal] = useState('');
+  const [hasPlan, setHasPlan] = useState(false);
   const [suggestedIds, setSuggestedIds] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [reasoning, setReasoning] = useState('');
@@ -46,11 +47,14 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
     mutationFn: () => planSprint(projectId, { capacity, focus: focus.trim() || undefined }),
     onSuccess: (plan) => {
       const availableIds = plan.todoIds.filter((id) => todosById.has(id));
+      setHasPlan(true);
       setGoal(plan.goal);
       setReasoning(plan.reasoning);
       setSuggestedIds(availableIds);
       setSelectedIds(availableIds);
-      setError(availableIds.length ? '' : t('The suggested plan did not include any Todos from the current backlog. Please try again.'));
+      setError(plan.todoIds.length > 0 && availableIds.length === 0
+        ? t('The suggested Todos are no longer in the backlog. Please try again.')
+        : '');
     },
   });
 
@@ -70,6 +74,11 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
   function requestPlan() {
     if (planMutation.isPending || !Number.isInteger(capacity) || capacity < 1 || capacity > 200) return;
     setError('');
+    setHasPlan(false);
+    setSuggestedIds([]);
+    setSelectedIds([]);
+    setGoal('');
+    setReasoning('');
     planMutation.reset();
     createMutation.reset();
     planMutation.mutate();
@@ -132,25 +141,31 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
                     : t('Unable to suggest a Sprint plan.')}
               </Alert>
             ) : null}
-            {suggestedIds.length > 0 ? (
+            {hasPlan ? (
               <>
                 <TextField label={t('Suggested Sprint goal')} required value={goal} onChange={(event) => setGoal(event.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} />
                 <Typography variant="body2" color={selectedPoints > capacity ? 'error.main' : 'text.secondary'}>
                   {t('Selected')}: {selectedPoints} / {capacity} {t('story points')}
                 </Typography>
-                <Stack spacing={0.75}>
-                  {suggestedIds.map((id) => {
-                    const todo = todosById.get(id);
-                    if (!todo) return null;
-                    return (
-                      <FormControlLabel
-                        key={id}
-                        control={<Checkbox checked={selectedIds.includes(id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, id] : current.filter((value) => value !== id))} />}
-                        label={`${todo.key} · ${todo.title} · ${todo.storyPoints ?? 0} pts`}
-                      />
-                    );
-                  })}
-                </Stack>
+                {suggestedIds.length ? (
+                  <Stack spacing={0.75}>
+                    {suggestedIds.map((id) => {
+                      const todo = todosById.get(id);
+                      if (!todo) return null;
+                      return (
+                        <FormControlLabel
+                          key={id}
+                          control={<Checkbox checked={selectedIds.includes(id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, id] : current.filter((value) => value !== id))} />}
+                          label={`${todo.key} · ${todo.title} · ${todo.storyPoints ?? 0} pts`}
+                        />
+                      );
+                    })}
+                  </Stack>
+                ) : error ? null : (
+                  <Alert severity="info">
+                    {t('No backlog Todos fit this capacity. Increase the capacity or add story-point estimates, then suggest a plan again.')}
+                  </Alert>
+                )}
                 <Alert severity="info">{reasoning}</Alert>
               </>
             ) : null}

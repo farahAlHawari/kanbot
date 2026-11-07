@@ -187,7 +187,6 @@ function mockPlanSprint(backlog: TodoRecord[], capacity: number, focus?: string)
   const words = (focus ?? '').toLowerCase().split(/\W+/).filter((w) => w.length > 3);
   const matchesFocus = (t: TodoRecord) => words.some((w) => `${t.title} ${t.description} ${t.labels.join(' ')}`.toLowerCase().includes(w));
   const ranked = backlog
-    .filter((t) => t.storyPoints !== null)
     .sort(
       (a, b) =>
         Number(matchesFocus(b)) - Number(matchesFocus(a)) ||
@@ -198,11 +197,12 @@ function mockPlanSprint(backlog: TodoRecord[], capacity: number, focus?: string)
   const picked: TodoRecord[] = [];
   let total = 0;
   for (const t of ranked) {
-    if (total + t.storyPoints! > capacity) continue;
+    const points = t.storyPoints ?? 0;
+    if (total + points > capacity) continue;
     picked.push(t);
-    total += t.storyPoints!;
+    total += points;
   }
-  const unestimated = backlog.length - ranked.length;
+  const unestimated = picked.filter((todo) => todo.storyPoints === null).length;
   const counts = TODO_PRIORITIES.map((p) => [p, picked.filter((t) => t.priority === p).length] as const)
     .filter(([, n]) => n > 0)
     .map(([p, n]) => `${n} ${p}`)
@@ -214,8 +214,8 @@ function mockPlanSprint(backlog: TodoRecord[], capacity: number, focus?: string)
     reasoning:
       (picked.length
         ? `Picked ${picked.length} todos (${counts}) by priority${words.length ? ' and focus' : ''}, bugs first, for ${total} of ${capacity} points.`
-        : `No estimated todo fits in ${capacity} points.`) +
-      (unestimated ? ` ${unestimated} todo(s) without story points were skipped — estimate them to include them.` : ''),
+        : `No todo fits in ${capacity} points.`) +
+      (unestimated ? ` ${unestimated} selected todo(s) have no story-point estimate and count as 0 points; estimate them for more accurate capacity planning.` : ''),
   };
 }
 
