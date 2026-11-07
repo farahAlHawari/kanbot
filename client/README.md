@@ -29,7 +29,7 @@ Implementation does not mean every acceptance criterion has been fully verified.
 
 ### Visual direction
 
-The design uses a Lagoon teal primary color with amber accents, cool neutral surfaces, and light/dark themes. Teal provides a calm, consistent action color; amber is reserved for emphasis. Shared typography, spacing, borders, and semantic colors keep project, Todo, and sprint states consistent. Focus indicators, text labels alongside status colors, reduced-motion support, and responsive navigation help keep the interface usable across screen sizes.
+The design uses a Lagoon teal primary color with amber accents, cool neutral surfaces, and light/dark themes. Teal provides a calm, consistent action color; amber is reserved for emphasis. Shared typography, spacing, borders, and semantic colors keep project, Todo, and sprint states consistent. Authentication fields use a white surface and the same teal focus color as the brand. Focus indicators, text labels alongside status colors, reduced-motion support, and responsive navigation help keep the interface usable across screen sizes.
 
 The supplied logo is retained with light and dark variants. The provided wireframes describe content and layout; the visual system is the client’s own design.
 
@@ -92,10 +92,12 @@ Use an existing project or disposable database for a demo. Creating sample data 
 In addition to the base requirements, the client includes:
 
 - Light and dark themes with a remembered preference.
+- A polished, responsive UI with consistent spacing, typography, and colors; white login/register fields with a Lagoon teal focus outline.
 - Responsive navigation, including a phone bottom navigation and a collapsed tablet rail.
 - Sprint sections on the backlog, drag-and-drop interactions, and accessible move/status alternatives.
 - AI chat starters, project-aware tools, Markdown answers, retryable errors, and a typewriter display effect.
 - A dedicated AI Tools section that separates chat from Todo generation, sprint planning, and summaries.
+- A full-width AI connection badge that identifies connected or Mock mode without exposing the configured model name.
 - A Todo details action to polish its text with AI; generated suggestions are reviewed before saving.
 - Shared status indicators, review disclaimers, reduced-motion behavior, and mobile-safe layouts.
 
