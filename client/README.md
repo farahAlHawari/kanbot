@@ -1,50 +1,47 @@
 # Kanbot Client
 
-Kanbot is a sprint-planning and task-management application. The client provides project workspaces, backlogs, sprint planning and boards, sprint history, and an AI assistant. All application data and AI provider calls are handled by the Backend API.
-
-## Technology
-
-- React 19 and TypeScript (strict mode)
-- Vite
-- Material UI
-- TanStack Query
-- React Router
-- dnd-kit
-- React Markdown
-
-## Source structure
-
-```text
-src/
-  app/                 Providers, routing, shell, theme, and feedback
-  features/
-    ai-assistant/      Assistant chat, AI sprint planning, summaries
-    auth/              Authentication, forms, and route guards
-    board/             Active Sprint board queries
-    projects/          Project management
-    sprints/           Sprint planning, board, and history
-    todos/             Backlog, Todo editing, and AI Todo drafts
-  shared/
-    api/               API request client and errors
-    components/        Shared UI components
-    types/             Backend API types
-```
-
-Server data is fetched and cached with TanStack Query. The JWT is stored in `localStorage`; user details and project data are loaded from the Backend.
+Kanbot is a personal project and sprint-management app. Its client provides authentication, project workspaces, an ordered Todo backlog, sprint planning, an active sprint board, sprint history, and an AI assistant. The client uses the Kanbot Backend API for data and AI operations.
 
 ## Requirements and implementation status
 
-The implementation covers the AUTH-1–6, PRJ-1–5, BL-1–7, SPR-1–7, AI-1–5, and NFR-1–9 requirement areas. The audit recorded 26 PASS and 13 NOT VERIFIED items; passing items are evidence-based, and unverified items are not claimed as complete. See the [requirement traceability report](./REQUIREMENT-TRACEABILITY.md) for per-ID implementation locations, verification evidence, status, and remaining issues.
+The client implements the AUTH, PRJ, BL, SPR, AI, and NFR requirement areas from [`docs/REQUIREMENTS.en.md`](../docs/REQUIREMENTS.en.md). Implemented functionality includes:
+
+- Account registration and login, persisted sessions, protected routes, and logout.
+- Project listing, creation, editing, deletion, and switching.
+- Todo creation and editing, backlog search and filters, priority ordering, and sprint assignment.
+- Planned and active sprints, a four-column board, sprint completion and history.
+- AI chat, Todo suggestions, sprint planning, and sprint summaries. AI-generated changes remain reviewable and require confirmation before they are saved.
+- Loading, empty, error, and mutation-feedback states across the application.
+
+Implementation does not mean every acceptance criterion has been fully verified. The current [requirement traceability report](./REQUIREMENT-TRACEABILITY.md) records **26 PASS, 13 NOT VERIFIED, and 0 FAIL** from its audit. In particular, some successful-login and redirect cases, drag-and-drop failure recovery, exhaustive AI error paths, and full accessibility review still need verification.
+
+## Technology choices
+
+| Choice | Why |
+|---|---|
+| React 19, strict TypeScript, and Vite | Meet the required frontend stack and provide typed components with a fast development/build workflow. |
+| Material UI | Provides consistent, responsive, keyboard-aware controls and dialogs without building a component library from scratch. |
+| TanStack Query | Keeps API data and cache invalidation out of local UI state and gives mutations shared loading/error handling. |
+| React Router | Supports project routes, protected pages, and restoring the intended destination after login. |
+| dnd-kit | Supports sprint-board and backlog interactions with accessible non-drag alternatives. |
+| React Markdown | Renders assistant replies as Markdown while leaving raw HTML disabled. |
+| Inter and JetBrains Mono | Inter keeps interface text readable; JetBrains Mono distinguishes code and keys. Both are self-hosted. |
+
+### Visual direction
+
+The design uses a Lagoon teal primary color with amber accents, cool neutral surfaces, and light/dark themes. Teal provides a calm, consistent action color; amber is reserved for emphasis. Shared typography, spacing, borders, and semantic colors keep project, Todo, and sprint states consistent. Focus indicators, text labels alongside status colors, reduced-motion support, and responsive navigation help keep the interface usable across screen sizes.
+
+The supplied logo is retained with light and dark variants. The provided wireframes describe content and layout; the visual system is the client’s own design.
 
 ## Prerequisites
 
-- Node.js compatible with the repository's Vite toolchain
+- Node.js compatible with the Vite toolchain
 - npm
 - The Kanbot Backend running locally or at an accessible API host
 
 ## Run locally
 
-Start the Backend in a separate terminal:
+In a first terminal, start the Backend from the repository root:
 
 ```powershell
 cd server
@@ -52,9 +49,7 @@ npm install
 npm run dev
 ```
 
-The client Vite configuration proxies `/api` requests to `http://127.0.0.1:4000`. With this default, the client can use the proxy without a client environment file.
-
-Start the client:
+In a second terminal, start the client:
 
 ```powershell
 cd client
@@ -62,59 +57,71 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. Register an account or sign in with a Backend account.
+The Vite development server proxies `/api` requests to `http://127.0.0.1:4000` by default. Open the local URL printed by Vite and register an account or sign in.
 
-If the Backend is not on the local default, create `client/.env.local` and set the API base URL:
+If the Backend is hosted elsewhere, create `client/.env.local`:
 
 ```dotenv
 VITE_API_URL=http://localhost:4000/api
 ```
 
-`VITE_API_URL` is the API base, including `/api`. When set, the client sends requests directly to that URL; configure the Backend's CORS allowlist for the client origin. Do not put credentials or provider API keys in any `VITE_*` variable: Vite embeds those values in the browser bundle.
+The value must be the API base URL ending in `/api`; configure the Backend CORS allowlist for the client origin when using a direct connection. **Never put API keys or other secrets in `VITE_*` variables** because Vite embeds them in the browser bundle.
 
-### Optional demo account
+### Demo data
 
-The repository's Backend seed script documents `demo@kanbot.dev` with password `password123`. The account exists only after the Backend has intentionally been seeded. Seeding changes database contents and is not required by the client; do not run it against a database whose data must be preserved. Otherwise, register a new account through the app.
+The optional Backend seed script creates `demo@kanbot.dev` with password `password123`. Seeding resets the Backend database. Do not run `npm run seed` if the existing local data needs to be preserved; instead, register a new account or use an intentionally disposable database.
 
-## AI integration
+## AI configuration
 
-The client calls the Backend endpoints for AI status, chat, Todo suggestions, Sprint planning, and Sprint summaries. It never calls Gemini, OpenAI, or another provider directly. The Backend returns mock responses when no provider is configured.
+The client calls the Backend for chat, Todo suggestions, sprint planning, sprint summaries, and AI connection status. It never calls an AI provider directly. With no provider configured, the Backend uses its limited Mock AI responses. For open-ended chat, configure the provider credentials and model on the **Backend only**, then restart it. See [`server/README.md`](../server/README.md#groq-ai-configuration) for setup. The client displays whether AI is connected or in Mock mode, but does not display provider model details.
 
-To enable a provider, configure the Backend's private environment (for example `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL`) in the Backend deployment environment and restart the Backend. Keep these values server-side; do not copy them into `client/.env`, `client/.env.local`, or any other `VITE_*` variable. The client displays a Mock AI badge when the Backend reports mock mode.
+## Demo walkthrough
 
-## UI and design
+The requirements request a short live or recorded demo. This checklist covers the required flow:
 
-The presentation follows the supplied Kanbot design brief while retaining React, MUI, and the existing application behavior. A single CSS-variable-enabled MUI theme defines light and dark Lagoon teal/amber schemes, cool neutral surfaces, semantic tints, typography, focus treatment, and component defaults. Task, Story, and Bug use distinct blue, purple, and red type accents; shared badges show type, status, and priority with text and icons as well as color. Inter and JetBrains Mono are self-hosted through `@fontsource-variable`; spacing, radii, motion, and other non-colour aliases are in `src/app/theme/tokens.css`.
+1. Register and create a project.
+2. Generate Todo drafts with AI, review them, and add selected drafts to the backlog.
+3. Use AI to plan a sprint; review capacity and selected Todos, then create the sprint.
+4. Start the sprint and move cards across the board.
+5. Complete the sprint and show its AI summary.
 
-The new light/dark wordmarks, tagline artwork, and mascot live under `src/assets/brand/`; the favicon and touch icon are in `public/`. Existing artwork was preserved. Authentication uses a responsive split hero/form card, and the app shell adapts from phone bottom navigation to a tablet icon rail and desktop sidebar. The Sprint board uses horizontal scroll and snap behavior on narrow screens. AI actions share a restrained teal treatment, assistant Markdown keeps raw HTML disabled, and the drawer displays the review disclaimer. Visible keyboard focus, reduced-motion handling, semantic labels, and coarse-pointer target sizing are included.
+Use an existing project or disposable database for a demo. Creating sample data in the shared local database changes that data; seeding resets it.
 
-The interface is English-only. Planned Sprint sections precede the Backlog as specified in the product requirements and wireframes. Shared loading, empty, and retryable error states are used across the data pages.
+## Enhancements
 
-The interface retains the real Backend integrations, TanStack Query synchronization, and accessible non-drag alternatives where implemented. Visual and responsive refinements do not imply that every requirement has passed end-to-end testing; see the [requirement traceability report](./REQUIREMENT-TRACEABILITY.md) for verified and unverified scenarios.
+In addition to the base requirements, the client includes:
+
+- Light and dark themes with a remembered preference.
+- Responsive navigation, including a phone bottom navigation and a collapsed tablet rail.
+- Sprint sections on the backlog, drag-and-drop interactions, and accessible move/status alternatives.
+- AI chat starters, project-aware tools, Markdown answers, retryable errors, and a typewriter display effect.
+- A dedicated AI Tools section that separates chat from Todo generation, sprint planning, and summaries.
+- A Todo details action to polish its text with AI; generated suggestions are reviewed before saving.
+- Shared status indicators, review disclaimers, reduced-motion behavior, and mobile-safe layouts.
+
+These enhancements use the existing Backend API. Chat history is held in client UI state for the current project session; it is not stored by the Backend.
 
 ## Commands
 
 Run these from `client/`:
 
 ```powershell
-npm run dev       # Vite development server
-npm run lint      # ESLint
+npm run dev       # Start the Vite development server
+npm run lint      # Run ESLint
 npm run build     # TypeScript project build and Vite production build
-npm run preview   # Serve the production build locally
+npm run preview   # Preview the production build
 ```
 
-There is no dedicated client test script in `package.json`. Manual browser QA and the current audit evidence are recorded in [REQUIREMENT-TRACEABILITY.md](./REQUIREMENT-TRACEABILITY.md).
+There is no dedicated client test script. Backend AI tests and API smoke tests are documented in [`server/README.md`](../server/README.md).
 
 ## Deployment
 
-Build the static client with `npm run build`; the output is written to `client/dist`. Deploy that directory to a static host configured to serve the SPA entry point for client-side routes.
+Build with `npm run build`; output is written to `client/dist`. Deploy that directory to a static host configured to serve the SPA entry point for client-side routes. A public deployment needs a publicly reachable Backend. Set `VITE_API_URL` at build time to the public API base ending in `/api`, or configure a same-origin `/api` reverse proxy. Configure Backend CORS for the deployed client origin. Keep all secrets in the Backend environment.
 
-A public deployment requires a publicly reachable Backend. Set `VITE_API_URL` at build time to the actual Backend API base URL ending in `/api`, or configure a same-origin reverse proxy for `/api`. No production Backend URL is configured or assumed by this project. Configure the Backend's CORS policy for the deployed client origin. Keep AI credentials and all other secrets exclusively in the Backend environment.
+## Known issues and verification gaps
 
-## Known limitations
-
-- Real Gemini/provider mode was not available for this audit; browser AI checks used the Backend's mock mode.
-- AI rate-limit and provider-failure handling, network-offline behavior, and every validation/error branch have not all been exercised.
-- Drag-and-drop failure rollback and the full keyboard accessibility/contrast audit remain unverified. See the traceability report for the exact scope.
-- Deployment against a public Backend has not been tested.
-- The production build succeeds but currently emits a bundle-size warning for a JavaScript chunk over 500 kB.
+- Some acceptance criteria remain **NOT VERIFIED**; see the [traceability report](./REQUIREMENT-TRACEABILITY.md) for individual scenarios and evidence.
+- Full keyboard-only and screen-reader testing, WCAG AA contrast measurement, offline behavior, and exhaustive loading/error-state coverage have not been completed.
+- Drag-and-drop rollback and failure feedback have not been verified under a forced Backend failure.
+- The production build reports a JavaScript chunk larger than 500 kB.
+- A live or recorded demo is a separate deliverable; this README provides its walkthrough but does not claim that a recording is included.

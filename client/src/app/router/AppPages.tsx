@@ -131,36 +131,41 @@ function ProjectNav({ projectId }: { projectId: string }) {
 
 function ThemeControl() {
   const { t } = useLocale();
-  const { mode, setMode } = useColorScheme();
+  const { mode, setMode, systemMode } = useColorScheme();
   if (!mode) return null;
-  const selectedMode = mode === 'dark' ? 'dark' : 'light';
+  const selectedMode = mode === 'dark' ? 'dark' : mode === 'system' ? 'system' : 'light';
+  const actualMode = mode === 'system' ? systemMode ?? 'light' : mode;
   return (
     <ToggleButtonGroup
       value={selectedMode}
       exclusive
       size="small"
       aria-label={t('Color theme')}
-      onChange={(_, nextMode: 'light' | 'dark' | null) => {
+      onChange={(_, nextMode: 'light' | 'dark' | 'system' | null) => {
         if (nextMode) setMode(nextMode);
       }}
       sx={{ width: '100%', mt: 1, '& .MuiToggleButton-root': { flex: 1, minWidth: 0, px: 0.5, py: 0.5, fontSize: 11 } }}
     >
-      <ToggleButton value="light" aria-label={t('Light theme')}><WbSunnyOutlined fontSize="small" /></ToggleButton>
-      <ToggleButton value="dark" aria-label={t('Dark theme')}><DarkModeOutlined fontSize="small" /></ToggleButton>
+      <ToggleButton value="light" aria-label={t('Light theme')} title={t('Light theme')}><WbSunnyOutlined fontSize="small" /></ToggleButton>
+      <ToggleButton value="dark" aria-label={t('Dark theme')} title={t('Dark theme')}><DarkModeOutlined fontSize="small" /></ToggleButton>
+      <ToggleButton value="system" aria-label={t('System theme')} title={t('System theme')}><Typography variant="caption" sx={{ fontWeight: 700 }}>{actualMode === 'dark' ? 'D' : 'L'}</Typography></ToggleButton>
     </ToggleButtonGroup>
   );
 }
 
 function ThemeCycleButton() {
   const { t } = useLocale();
-  const { mode, setMode } = useColorScheme();
+  const { mode, systemMode, setMode } = useColorScheme();
   if (!mode) return null;
-  const nextMode = mode === 'dark' ? 'light' : 'dark';
-  const Icon = mode === 'dark' ? DarkModeOutlined : WbSunnyOutlined;
+  const resolvedMode = mode === 'system' ? systemMode ?? 'light' : mode;
+  const nextMode = resolvedMode === 'dark' ? 'light' : 'dark';
+  const Icon = resolvedMode === 'dark' ? DarkModeOutlined : WbSunnyOutlined;
   return (
     <Button
-      aria-label={`${t('Theme')}: ${mode}. ${t('Switch to')} ${nextMode}`}
-      title={`${t('Theme')}: ${mode}`}
+      aria-label={mode === 'system'
+        ? `${t('Theme')}: ${t('System')} (${resolvedMode}). ${t('Switch to')} ${nextMode}`
+        : `${t('Theme')}: ${resolvedMode}. ${t('Switch to')} ${nextMode}`}
+      title={mode === 'system' ? `${t('Theme')}: ${t('System')} (${resolvedMode})` : `${t('Theme')}: ${resolvedMode}`}
       onClick={() => setMode(nextMode)}
       sx={{ minWidth: 40, width: 40, px: 0, display: { xs: 'inline-flex', lg: 'none' } }}
     >

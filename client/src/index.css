@@ -117,12 +117,25 @@ a {
 }
 
 .auth-field .MuiOutlinedInput-root {
-  background-color: var(--mui-palette-background-paper);
-  color: var(--mui-palette-text-primary);
+  background-color: #fff;
+  color: #0f1b22;
+}
+
+.auth-field .MuiOutlinedInput-root.Mui-focused:not(.Mui-error) .MuiOutlinedInput-notchedOutline {
+  border-color: var(--mui-palette-primary-main);
+  border-width: 2px;
+}
+
+.auth-field input:-webkit-autofill,
+.auth-field input:-webkit-autofill:hover,
+.auth-field input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: #0f1b22;
+  caret-color: #0f1b22;
 }
 
 .auth-field .MuiInputLabel-root {
-  color: var(--mui-palette-text-secondary);
+  color: #44545d;
 }
 
 .auth-field .MuiInputLabel-root.Mui-focused {

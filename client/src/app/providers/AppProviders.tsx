@@ -19,8 +19,8 @@ export function AppProviders() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <InitColorSchemeScript attribute="data" defaultMode="light" />
-        <ThemeProvider theme={theme} defaultMode="light" disableTransitionOnChange>
+        <InitColorSchemeScript attribute="data" defaultMode="system" />
+        <ThemeProvider theme={theme} defaultMode="system" disableTransitionOnChange>
           <CssBaseline enableColorScheme />
           <FeedbackProvider>
             <AuthProvider>

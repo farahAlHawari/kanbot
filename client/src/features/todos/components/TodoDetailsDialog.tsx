@@ -15,8 +15,10 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import { listSprints } from '../../sprints/api/sprints-api';
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { getFieldErrors } from '../../../shared/api/errors';
@@ -26,6 +28,35 @@ import { STORY_POINTS, TODO_PRIORITIES, TODO_STATUSES, TODO_TYPES } from '../../
 import { deleteTodo, updateTodo } from '../api/todos-api';
 import { todosQueryKey } from '../hooks/use-backlog';
 import { useLocale } from '../../../app/providers/use-locale';
+import { chat } from '../../ai-assistant/api/ai-api';
+import { useAiStatus } from '../../ai-assistant/hooks/use-ai-status';
+import { AiModeBadge } from '../../ai-assistant/components/AiModeBadge';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parsePolishedTodo(content: string): { title: string; description: string } {
+  const json = content.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) throw new Error('The AI response could not be read. Please try again.');
+
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch {
+    throw new Error('The AI response could not be read. Please try again.');
+  }
+  if (!isRecord(value) || typeof value.title !== 'string' || typeof value.description !== 'string') {
+    throw new Error('The AI response did not include a valid title and description. Please try again.');
+  }
+
+  const title = value.title.trim();
+  const description = value.description.trim();
+  if (!title || title.length > 200 || description.length > 5000) {
+    throw new Error('The AI response did not include a valid title and description. Please try again.');
+  }
+  return { title, description };
+}
 
 interface TodoFields {
   title: string;
@@ -78,13 +109,40 @@ export function TodoDetailsDialog({
   const [discardOpen, setDiscardOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [polishedDraft, setPolishedDraft] = useState<{ title: string; description: string } | null>(null);
   const queryClient = useQueryClient();
   const { notify } = useFeedback();
+  const aiStatusQuery = useAiStatus();
   const sprintsQuery = useQuery({
     queryKey: ['sprints', projectId],
     queryFn: () => listSprints(projectId),
   });
   const sprints: Sprint[] = sprintsQuery.data?.sprints ?? [];
+
+  const polishMutation = useMutation({
+    mutationFn: async () => {
+      const { message } = await chat(projectId, {
+        messages: [{
+          role: 'user',
+          content: [
+            'Polish this Todo for clarity. Do not invent requirements or change its intent.',
+            'Return only valid JSON with exactly two string properties: {"title":"...","description":"..."}',
+            'Keep the title concise. Make the description actionable and include acceptance criteria only when supported by the supplied details.',
+            `Current title: ${fields.title}`,
+            `Current description: ${fields.description || '(empty)'}`,
+          ].join('\n\n'),
+        }],
+      });
+      return parsePolishedTodo(message.content);
+    },
+    onSuccess: (draft) => {
+      setPolishedDraft(draft);
+      setServerError(null);
+    },
+    onError: (failure: unknown) => {
+      setServerError(failure instanceof Error ? failure.message : t('Unable to polish this Todo.'));
+    },
+  });
 
   const saveMutation = useMutation({
     mutationFn: (input: UpdateTodoRequest) => updateTodo(todo.id, input),
@@ -145,10 +203,11 @@ export function TodoDetailsDialog({
   });
 
   const dirty = !sameFields(initialFields, fields);
-  const pending = saveMutation.isPending || deleteMutation.isPending;
+  const pending = saveMutation.isPending || deleteMutation.isPending || polishMutation.isPending;
 
   function setField<Key extends keyof TodoFields>(key: Key, value: TodoFields[Key]) {
     setFields((current) => ({ ...current, [key]: value }));
+    setPolishedDraft(null);
     setErrors((current) => {
       const next = { ...current };
       delete next[key];
@@ -253,6 +312,61 @@ export function TodoDetailsDialog({
                 error={Boolean(errors.title)}
                 helperText={errors.title || ' '}
               />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+                <AiModeBadge />
+                <Tooltip title={aiStatusQuery.data?.mode === 'mock'
+                  ? t('Connect an AI model to polish this Todo.')
+                  : aiStatusQuery.isError
+                    ? t('AI availability could not be checked.')
+                    : aiStatusQuery.isLoading
+                      ? t('Checking AI availability…')
+                      : t('Rewrite the title and description for clarity. You can review before applying.')}>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={polishMutation.isPending ? <CircularProgress size={16} /> : <AutoAwesomeOutlined />}
+                      disabled={aiStatusQuery.data?.mode !== 'ai' || polishMutation.isPending || pending}
+                      onClick={() => {
+                        setServerError(null);
+                        polishMutation.mutate();
+                      }}
+                    >
+                      {t('Polish with AI')}
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Stack>
+              {aiStatusQuery.data?.mode === 'mock' ? (
+                <Typography variant="caption" color="text.secondary">
+                  {t('AI polishing requires a connected AI model.')}
+                </Typography>
+              ) : null}
+              {polishMutation.isPending ? (
+                <Typography role="status" aria-live="polite">{t('Polishing this Todo…')}</Typography>
+              ) : null}
+              {polishedDraft ? (
+                <Alert
+                  severity="info"
+                  action={(
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => {
+                        setField('title', polishedDraft.title);
+                        setField('description', polishedDraft.description);
+                        setPolishedDraft(null);
+                      }}
+                    >
+                      {t('Apply')}
+                    </Button>
+                  )}
+                >
+                  <Typography variant="subtitle2">{t('Review AI suggestion')}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{polishedDraft.title}</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>{polishedDraft.description}</Typography>
+                </Alert>
+              ) : null}
               <TextField
                 label={t('Description')}
                 fullWidth

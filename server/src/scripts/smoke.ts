@@ -153,8 +153,7 @@ await step('board: columns, drag between columns, patch status', async () => {
 
 await step('ai: status, generate todos, plan sprint, chat (mock)', async () => {
   const aiStatus = await call('GET', '/ai/status');
-  assert.equal(aiStatus.json.mode, 'mock');
-  assert.equal(aiStatus.json.model, null);
+  assert.deepEqual(aiStatus.json, { mode: 'mock' });
   const gen = await call('POST', `/projects/${projectId}/ai/generate-todos`, { prompt: 'User profile page', count: 4 });
   assert.equal(gen.status, 200);
   assert.equal(gen.json.todos.length, 4);
@@ -176,6 +175,8 @@ await step('ai: status, generate todos, plan sprint, chat (mock)', async () => {
   const chat = await call('POST', `/projects/${projectId}/ai/chat`, { messages: [{ role: 'user', content: 'How is the sprint going?' }] });
   assert.equal(chat.json.message.role, 'assistant');
   assert.match(chat.json.message.content, /Sprint 1/);
+  const generalChat = await call('POST', `/projects/${projectId}/ai/chat`, { messages: [{ role: 'user', content: 'What is the capital of France?' }] });
+  assert.match(generalChat.json.message.content, /Mock AI mode|limited set of questions/i);
   assert.equal((await call('POST', `/projects/${projectId}/ai/chat`, { messages: [{ role: 'assistant', content: 'hi' }] })).status, 400);
 });
 

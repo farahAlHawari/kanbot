@@ -266,7 +266,6 @@ export type AiSource = 'mock' | 'ai';
 /** GET /ai/status */
 export interface AiStatusResponse {
   mode: AiSource;
-  model: string | null;
 }
 
 /** A suggested todo that is NOT saved yet. Save with POST /projects/:id/todos/bulk. */

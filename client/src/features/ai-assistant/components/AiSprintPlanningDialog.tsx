@@ -21,6 +21,7 @@ import { createSprint } from '../../sprints/api/sprints-api';
 import { sprintsQueryKey } from '../../sprints/hooks/use-sprints';
 import { todosQueryKey, useBacklog } from '../../todos/hooks/use-backlog';
 import { planSprint } from '../api/ai-api';
+import { AiModeBadge } from './AiModeBadge';
 import { useLocale } from '../../../app/providers/use-locale';
 
 const EMPTY_TODOS: Todo[] = [];
@@ -93,10 +94,16 @@ export function AiSprintPlanningDialog({ projectId, onClose }: { projectId: stri
 
   return (
     <Dialog open onClose={planMutation.isPending || createMutation.isPending ? undefined : onClose} fullWidth maxWidth="md" aria-labelledby="plan-sprint-dialog-title">
-      <DialogTitle id="plan-sprint-dialog-title">{t('Plan a Sprint with AI')}</DialogTitle>
+      <DialogTitle id="plan-sprint-dialog-title">
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+          {t('Plan a Sprint with AI')}
+          <AiModeBadge />
+        </Stack>
+      </DialogTitle>
       <DialogContent dividers>
           <Stack spacing={2}>
             {error ? <Alert severity="error">{error}</Alert> : null}
+            {planMutation.isPending ? <Typography role="status" aria-live="polite">{t('Planning your Sprint…')}</Typography> : null}
             {backlogQuery.isLoading ? (
               <Alert severity="info" icon={<CircularProgress size={18} />}>{t('Loading backlog for Sprint planning…')}</Alert>
             ) : null}

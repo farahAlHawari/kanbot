@@ -7,6 +7,7 @@ import { ApiError } from '../../../shared/api/errors';
 import type { Sprint } from '../../../shared/types/api';
 import { sprintsQueryKey } from '../../sprints/hooks/use-sprints';
 import { summarizeSprint } from '../api/ai-api';
+import { AiModeBadge } from './AiModeBadge';
 import { useLocale } from '../../../app/providers/use-locale';
 
 export function SprintSummaryPanel({
@@ -43,7 +44,10 @@ export function SprintSummaryPanel({
       <CardContent>
         <Stack spacing={1.5}>
           <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1 }}>
-            <Typography component="h2" variant="h3">{t('AI Sprint summary')}</Typography>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography component="h2" variant="h3">{t('AI Sprint summary')}</Typography>
+              <AiModeBadge />
+            </Stack>
             {sprint.status !== 'planned' ? (
               <Button variant="ai" startIcon={<AutoAwesomeOutlined />} onClick={() => mutation.mutate()} disabled={mutation.isPending}>
                 {mutation.isPending ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}
@@ -58,7 +62,7 @@ export function SprintSummaryPanel({
               {errorMessage}
             </Alert>
           ) : null}
-          {mutation.isPending && !sprint.summary ? <Typography color="text.secondary">{t('Thinking…')}</Typography> : null}
+          {mutation.isPending && !sprint.summary ? <Typography color="text.secondary" role="status" aria-live="polite">{t('Generating Sprint summary…')}</Typography> : null}
           {sprint.summary ? (
             <>
               <ReactMarkdown>{sprint.summary.content}</ReactMarkdown>

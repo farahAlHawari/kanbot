@@ -20,8 +20,8 @@ npm run typecheck
 
 | `.env` | Behaviour |
 |---|---|
-| `AI_API_KEY` empty (default) | **Mock mode**: rule-based answers, instant, free, offline. `GET /api/ai/status` → `{ "mode": "mock" }` |
-| `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL` set | **Groq** via its OpenAI-compatible `POST /openai/v1/chat/completions` endpoint. `GET /api/ai/status` reports `{ "mode": "ai", "model": "<configured model>" }`. |
+| `AI_API_KEY` empty (default) | **Mock mode**: rule-based answers to a limited set of project questions, instant, free, offline. General open-ended chat requires an AI provider. `GET /api/ai/status` → `{ "mode": "mock" }` |
+| `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL` set | **Groq** via its OpenAI-compatible `POST /openai/v1/chat/completions` endpoint. Chat responds conversationally to general topics as well as project questions. `GET /api/ai/status` reports `{ "mode": "ai" }` without exposing provider model details. |
 
 To enable Groq locally:
 

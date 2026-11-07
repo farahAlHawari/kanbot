@@ -18,6 +18,7 @@ import {
 import { useFeedback } from '../../../app/providers/use-feedback';
 import { ApiError } from '../../../shared/api/errors';
 import { generateTodos } from '../../ai-assistant/api/ai-api';
+import { AiModeBadge } from '../../ai-assistant/components/AiModeBadge';
 import { createTodosBulk } from '../api/todos-api';
 import { todosQueryKey } from '../hooks/use-backlog';
 import { STORY_POINTS, TODO_PRIORITIES, TODO_TYPES, type DraftTodo, type StoryPoints, type TodoPriority, type TodoType } from '../../../shared/types/api';
@@ -96,10 +97,16 @@ export function GenerateTodosDialog({ projectId, onClose }: { projectId: string;
 
   return (
     <Dialog open onClose={generateMutation.isPending || saveMutation.isPending ? undefined : onClose} fullWidth maxWidth="md" aria-labelledby="generate-todos-dialog-title">
-      <DialogTitle id="generate-todos-dialog-title">{t('Generate Todos with AI')}</DialogTitle>
+      <DialogTitle id="generate-todos-dialog-title">
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+          {t('Generate Todos with AI')}
+          <AiModeBadge />
+        </Stack>
+      </DialogTitle>
     <DialogContent dividers>
       <Stack spacing={2}>
         {error ? <Alert severity="error" role="alert">{error}</Alert> : null}
+        {generateMutation.isPending ? <Typography role="status" aria-live="polite">{t('Generating suggestions…')}</Typography> : null}
         <form onSubmit={handleGenerate}>
           <Stack spacing={2}>
           <TextField

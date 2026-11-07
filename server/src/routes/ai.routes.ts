@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { aiSource, chat, generateTodos, planSprint, summarizeSprint } from '../ai/assistant.service.js';
-import { env } from '../config/env.js';
 import { db } from '../db/store.js';
 import { AppError, conflict } from '../lib/errors.js';
 import { currentUser } from '../middleware/auth.js';
@@ -31,7 +30,7 @@ const aiLimiter = rateLimit({
 });
 
 aiRouter.get('/ai/status', (_req, res) => {
-  res.json({ mode: aiSource(), model: env.aiEnabled ? env.AI_MODEL : null } satisfies AiStatusResponse);
+  res.json({ mode: aiSource() } satisfies AiStatusResponse);
 });
 
 aiRouter.post('/projects/:projectId/ai/generate-todos', aiLimiter, async (req, res) => {
